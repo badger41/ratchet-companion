@@ -1,0 +1,38 @@
+# OS/editor noise
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.sw?
+*.suo
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Environment/local overrides
+*.local
+
+# Node / Vite / Electron
+node_modules/
+ui/node_modules/
+dist/
+dist-ssr/
+ui/dist/
+ui/dist-electron/
+
+# .NET build artifacts
+bin/
+obj/
+
+# Production builds
+build/
+
+# User-specific IDE files
+*.user
+*.rsuser

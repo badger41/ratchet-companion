@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../RatchetCompanion.Core/RatchetCompanion.Core.csproj" />
+    <ProjectReference Include="../RatchetCompanion.PCSX2/RatchetCompanion.PCSX2.csproj" />
+    <ProjectReference Include="../RatchetCompanion.Games.RAC1/RatchetCompanion.Games.RAC1.csproj" />
+    <ProjectReference Include="../RatchetCompanion.Games.GC/RatchetCompanion.Games.GC.csproj" />
+    <ProjectReference Include="../RatchetCompanion.Games.UYA/RatchetCompanion.Games.UYA.csproj" />
+    <ProjectReference Include="../RatchetCompanion.Games.DL/RatchetCompanion.Games.DL.csproj" />
+  </ItemGroup>
+
+</Project>

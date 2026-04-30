@@ -1,0 +1,29 @@
+{
+  "appId": "com.badger41.ratchetcompanion",
+  "productName": "Ratchet Companion",
+  "directories": {
+    "buildResources": "public",
+    "output": "release"
+  },
+  "files": [
+    "dist/**",
+    "dist-electron/**",
+    "package.json"
+  ],
+  "extraResources": [
+    {
+      "from": "../build/artifacts/backend-linux-x64",
+      "to": "backend"
+    }
+  ],
+  "electronLanguages": [
+    "en-US"
+  ],
+  "linux": {
+    "target": [
+      "AppImage"
+    ],
+    "category": "Utility",
+    "artifactName": "${productName}-${version}-${arch}.${ext}"
+  }
+}

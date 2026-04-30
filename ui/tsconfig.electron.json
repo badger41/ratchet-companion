@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.node.json",
+  "compilerOptions": {
+    "rootDir": "./electron",
+    "outDir": "dist-electron",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "target": "ES2022",
+    "types": ["node"],
+    "ignoreDeprecations": "6.0",
+    "allowImportingTsExtensions": false,
+    "verbatimModuleSyntax": false,
+    "erasableSyntaxOnly": false,
+    "noEmit": false
+  },
+  "include": ["electron/**/*.cts"]
+}
