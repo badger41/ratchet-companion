@@ -45,6 +45,8 @@ var websocketJsonOptions = new JsonSerializerOptions
     PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
 };
 var websocketStatusInterval = TimeSpan.FromMilliseconds(250);
+var websocketMemoryInterval = TimeSpan.FromMilliseconds(250);
+const int MaxWebsocketMemoryBytes = 4096;
 
 app.UseCors();
 app.UseWebSockets();
@@ -111,6 +113,53 @@ app.Map("/ws/status", async (HttpContext context, StatusSnapshotFactory snapshot
         catch (TimeoutException)
         {
         }
+    }
+});
+
+app.Map("/ws/memory", async (HttpContext context, IPcsx2Runtime pcsx2Runtime) =>
+{
+    if (!context.WebSockets.IsWebSocketRequest)
+    {
+        context.Response.StatusCode = StatusCodes.Status400BadRequest;
+        return;
+    }
+
+    if (!uint.TryParse(context.Request.Query["address"], out var address) ||
+        !int.TryParse(context.Request.Query["byteCount"], out var byteCount) ||
+        byteCount <= 0 ||
+        byteCount > MaxWebsocketMemoryBytes)
+    {
+        context.Response.StatusCode = StatusCodes.Status400BadRequest;
+        await context.Response.WriteAsync($"address and byteCount are required. byteCount must be between 1 and {MaxWebsocketMemoryBytes}.");
+        return;
+    }
+
+    using var webSocket = await context.WebSockets.AcceptWebSocketAsync();
+    var cancellationToken = context.RequestAborted;
+    string? lastSentBytes = null;
+
+    while (!cancellationToken.IsCancellationRequested && webSocket.State == WebSocketState.Open)
+    {
+        var currentValue = await pcsx2Runtime.ReadMemoryAsync(address, byteCount, cancellationToken);
+        var currentBytes = currentValue is null ? null : Convert.ToBase64String(currentValue);
+
+        if (!string.Equals(lastSentBytes, currentBytes, StringComparison.Ordinal))
+        {
+            var json = JsonSerializer.Serialize(
+                new
+                {
+                    address,
+                    byteCount,
+                    bytes = currentBytes,
+                },
+                websocketJsonOptions);
+
+            var payload = System.Text.Encoding.UTF8.GetBytes(json);
+            await webSocket.SendAsync(payload, WebSocketMessageType.Text, true, cancellationToken);
+            lastSentBytes = currentBytes;
+        }
+
+        await Task.Delay(websocketMemoryInterval, cancellationToken);
     }
 });
 

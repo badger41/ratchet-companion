@@ -10,22 +10,23 @@ import {
 import { useMemo, useState } from 'react';
 import { getMobyName } from '../data/pvarOverlayLookup';
 import type { MobySummary } from '../models/gameData';
+import { formatOClass, formatPointer } from '../utils/format';
 
 type MobyListCardProps = {
   title: string;
   mobys: MobySummary[];
   gameId: number;
+  selectedMoby: MobySummary | null;
+  onSelectedMobyChange: (moby: MobySummary | null) => void;
 };
 
-function formatOClass(value: number) {
-  return `0x${value.toString(16).toUpperCase().padStart(4, '0')}`;
-}
-
-function formatPointer(value: number) {
-  return `0x${value.toString(16).toUpperCase().padStart(8, '0')}`;
-}
-
-export function MobyListCard({ title, mobys, gameId }: MobyListCardProps) {
+export function MobyListCard({
+  title,
+  mobys,
+  gameId,
+  selectedMoby,
+  onSelectedMobyChange,
+}: MobyListCardProps) {
   const [activeTab, setActiveTab] = useState<'dynamic' | 'static'>('dynamic');
 
   const dynamicMobys = useMemo(
@@ -70,10 +71,15 @@ export function MobyListCard({ title, mobys, gameId }: MobyListCardProps) {
   ];
 
   return (
-    <Table
-      variant="container"
-      header={
-        <Header
+    <div id="temp-wrapper" style={{
+      maxHeight: "75vh",
+      overflow: 'auto'
+    }}>
+      <Table
+        variant="container"
+        stickyHeader
+        header={
+                  <Header
           variant="h2"
           headingTagOverride="h3"
           counter={
@@ -85,30 +91,41 @@ export function MobyListCard({ title, mobys, gameId }: MobyListCardProps) {
         >
           {title}
         </Header>
-      }
-      filter={
-        <Tabs
-          ariaLabel={`${title} tabs`}
-          tabs={tabs}
-          activeTabId={activeTab}
-          onChange={({ detail }) =>
-            setActiveTab(detail.activeTabId as 'dynamic' | 'static')
-          }
-        />
-      }
-      items={visibleMobys}
-      trackBy={(item) => `${item.pointer}-${item.oClass}`}
-      columnDefinitions={columnDefinitions}
-      wrapLines
-      stripedRows
-      contentDensity="compact"
-      sortingColumn={columnDefinitions[0]}
-      empty={
-        <Box textAlign="center" color="inherit">
-          No {activeTab} mobys available.
-        </Box>
-      }
-      ariaLabels={{ tableLabel: title }}
-    />
+        }
+        filter={
+          <Tabs
+            ariaLabel={`${title} tabs`}
+            tabs={tabs}
+            activeTabId={activeTab}
+            onChange={({ detail }) =>
+              setActiveTab(detail.activeTabId as 'dynamic' | 'static')
+            }
+          />
+        }
+        items={visibleMobys}
+        selectedItems={selectedMoby ? [selectedMoby] : []}
+        selectionType="single"
+        onSelectionChange={({ detail }) =>
+          onSelectedMobyChange(detail.selectedItems[0] ?? null)
+        }
+        trackBy={(item) => `${item.pointer}-${item.oClass}`}
+        columnDefinitions={columnDefinitions}
+        wrapLines
+        stripedRows
+        contentDensity="compact"
+        sortingColumn={columnDefinitions[0]}
+        empty={
+          <Box textAlign="center" color="inherit">
+            No {activeTab} mobys available.
+          </Box>
+        }
+        ariaLabels={{
+          tableLabel: title,
+          selectionGroupLabel: 'Moby selection',
+          itemSelectionLabel: ({ selectedItems }, item) =>
+            `${selectedItems.includes(item) ? 'Deselect' : 'Select'} ${formatPointer(item.pointer)}`,
+        }}
+      />
+    </div>
   );
 }

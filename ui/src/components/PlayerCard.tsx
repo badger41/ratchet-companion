@@ -5,17 +5,12 @@ import {
   KeyValuePairs,
 } from '@cloudscape-design/components';
 import type { PlayerPosition } from '../models/gameData';
+import { formatCoordinate } from '../utils/format';
 
 type PlayerCardProps = {
   title: string;
   position: PlayerPosition | null;
 };
-
-function formatCoordinate(value: number | null | undefined) {
-  return typeof value === 'number' && Number.isFinite(value)
-    ? value.toFixed(3)
-    : '—';
-}
 
 export function PlayerCard({ title, position }: PlayerCardProps) {
   return (
