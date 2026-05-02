@@ -2,6 +2,6 @@
 
 interface Window {
   ratchetCompanion?: {
-    backendBaseUrl: string
-  }
+    backendBaseUrl: string;
+  };
 }

@@ -9,6 +9,7 @@ public sealed class Pcsx2MemoryWatchService(IPcsx2Runtime pcsx2Runtime) : Backgr
     private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(250);
 
     private readonly ConcurrentDictionary<string, UInt32WatchState> _uint32Watches = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, MemoryWatchState> _memoryWatches = new(StringComparer.Ordinal);
     private readonly object _notificationGate = new();
     private long _changeVersion;
     private TaskCompletionSource<long> _nextChangeTcs = CreateSignal();
@@ -30,6 +31,16 @@ public sealed class Pcsx2MemoryWatchService(IPcsx2Runtime pcsx2Runtime) : Backgr
             key,
             _ => new UInt32WatchState(address),
             (_, existing) => existing.Address == address ? existing : new UInt32WatchState(address));
+    }
+
+    public void WatchMemory(string key, uint address, int byteCount)
+    {
+        _memoryWatches.AddOrUpdate(
+            key,
+            _ => new MemoryWatchState(address, byteCount),
+            (_, existing) => existing.Address == address && existing.ByteCount == byteCount
+                ? existing
+                : new MemoryWatchState(address, byteCount));
     }
 
     public uint? GetUInt32(string key)
@@ -55,6 +66,16 @@ public sealed class Pcsx2MemoryWatchService(IPcsx2Runtime pcsx2Runtime) : Backgr
             foreach (var watch in _uint32Watches.Values)
             {
                 var currentValue = await pcsx2Runtime.ReadUInt32Async(watch.Address, stoppingToken);
+
+                if (watch.TryUpdate(currentValue))
+                {
+                    PublishChange();
+                }
+            }
+
+            foreach (var watch in _memoryWatches.Values)
+            {
+                var currentValue = await pcsx2Runtime.ReadMemoryAsync(watch.Address, watch.ByteCount, stoppingToken);
 
                 if (watch.TryUpdate(currentValue))
                 {
@@ -112,6 +133,44 @@ public sealed class Pcsx2MemoryWatchService(IPcsx2Runtime pcsx2Runtime) : Backgr
                 _currentValue = value;
                 return true;
             }
+        }
+    }
+
+    private sealed class MemoryWatchState(uint address, int byteCount)
+    {
+        private readonly object _gate = new();
+        private byte[]? _currentValue;
+
+        public uint Address { get; } = address;
+        public int ByteCount { get; } = byteCount;
+
+        public bool TryUpdate(byte[]? value)
+        {
+            lock (_gate)
+            {
+                if (AreEqual(_currentValue, value))
+                {
+                    return false;
+                }
+
+                _currentValue = value is null ? null : [.. value];
+                return true;
+            }
+        }
+
+        private static bool AreEqual(byte[]? left, byte[]? right)
+        {
+            if (ReferenceEquals(left, right))
+            {
+                return true;
+            }
+
+            if (left is null || right is null || left.Length != right.Length)
+            {
+                return false;
+            }
+
+            return left.AsSpan().SequenceEqual(right);
         }
     }
 }

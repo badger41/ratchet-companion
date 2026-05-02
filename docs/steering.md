@@ -8,6 +8,7 @@ This document is a handoff/steering guide for future contributors and agents wor
 - Desktop shell + UI: Electron + React + Vite under `ui/`
 - Backend is loopback-only and serves the UI over `http://127.0.0.1:48123`
 - UI consumes backend state primarily through websocket push at `/ws/status`
+- UI uses Cloudscape Design System components with dark mode enabled by default.
 
 ## Repo Structure Conventions
 
@@ -36,6 +37,13 @@ Current pattern:
 - module-owned payloads
 
 That means each game module is responsible for shaping its own payload and schema.
+
+The UI should mirror those schemas in:
+- `ui/src/models/gameDataSnapshot.ts`
+
+Add new backend `GameDataSnapshot.Schema` values to the `GameDataPayloadBySchema`
+map so TypeScript can narrow payloads by schema. Avoid UI-side JSON normalizers
+for trusted backend contracts; prefer direct typed access after `schema` narrowing.
 
 ### 2. Module-owned snapshot creation
 
@@ -171,6 +179,13 @@ Future performance work should prefer caching expensive game-specific reads in b
 
 ## UI / Electron Packaging Notes
 
+### UI structure
+
+- Cloudscape `TopNavigation` owns app/game identity and high-level backend status.
+- `/ws/status` state is centralized in `useBackendStatus`.
+- Game-detail components should receive typed models derived from the status snapshot.
+- Keep status envelope parsing simple: the backend contract is trusted and camelCase.
+
 ### Build organization
 
 - root `npm run build` = compile/build only
@@ -208,6 +223,8 @@ On Linux/Bazzite, expected path is typically somewhere under:
 - Placeholder `Class1.cs` files from template generation were removed where unused
 - Do not reintroduce template placeholder files
 - Keep empty/generated clutter out of game/runtime projects unless actually needed
+- UI TypeScript/TSX/CSS formatting is owned by Prettier; semicolons are required.
+- Run `npm run lint` and `npm run format:check` in `ui/` for UI hygiene checks.
 
 ## Practical Contributor Rules
 
@@ -219,6 +236,7 @@ On Linux/Bazzite, expected path is typically somewhere under:
 6. For Windows/Linux direct memory access, follow PCSX2’s real shared-memory model, not heuristics if avoidable.
 7. Use the local cloned PCSX2 source for implementation guidance, but do not assume upstream can be changed.
 8. When touching Electron startup behavior, preserve file logging so remote testers can send useful logs.
+9. When adding game-data UI, update the TypeScript schema map instead of hand-parsing payload JSON.
 
 ## Good Next Places To Look
 

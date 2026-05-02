@@ -4,7 +4,7 @@ Companion app for the ratchet and clank ps2 series, for use with PCSX2.
 ## Workspace layout
 
 - `lib/` — .NET 9 backend solution and emulator integration libraries
-- `ui/` — Electron + React + Vite + TypeScript desktop UI
+- `ui/` — Electron + React + Vite + TypeScript + Cloudscape desktop UI
 - `docs/` — architecture notes and per-game research
 
 ## Backend projects
@@ -67,7 +67,14 @@ UI workspace directly:
 ```bash
 cd ui
 npm run dev
+npm run lint
+npm run format:check
+npm run format
 ```
+
+The UI uses Prettier and ESLint with semicolons required. Run `npm run format`
+before committing UI changes if your editor is not already applying the project
+Prettier config.
 
 ## Linux production build
 

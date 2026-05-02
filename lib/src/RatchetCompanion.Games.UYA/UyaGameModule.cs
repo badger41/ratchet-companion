@@ -4,9 +4,16 @@ using RatchetCompanion.Games.UYA.MP;
 
 namespace RatchetCompanion.Games.UYA;
 
-public sealed record UyaMapIdGameData(uint? CurrentMapId, bool IsAvailable, UyaMpPlayerPosition? PlayerPosition);
+public sealed record UyaMpGameData(
+    uint? CurrentMapId,
+    bool IsAvailable,
+    UyaMpPlayerPosition? PlayerPosition,
+    UyaMpMobyListData? MobyList);
 
-public sealed class UyaGameModule(UyaMemoryExample uyaMemoryExample, UyaMpPlayerMemory uyaMpPlayerMemory) : IGameModule, IGameDataSnapshotProvider
+public sealed class UyaGameModule(
+    UyaMemoryExample uyaMemoryExample,
+    UyaMpPlayerMemory uyaMpPlayerMemory,
+    UyaMpMobyMemory uyaMpMobyMemory) : IGameModule, IGameDataSnapshotProvider
 {
     public GameId GameId => GameId.UYA;
     public string DisplayName => "Ratchet & Clank: Up Your Arsenal";
@@ -17,13 +24,15 @@ public sealed class UyaGameModule(UyaMemoryExample uyaMemoryExample, UyaMpPlayer
     {
         var currentMapId = await uyaMemoryExample.ReadCurrentMapIdAsync(cancellationToken);
         var playerPosition = await uyaMpPlayerMemory.ReadLocalPlayerPositionAsync(cancellationToken);
+        var mobyList = await uyaMpMobyMemory.ReadMobysAsync(cancellationToken);
 
         return new GameDataSnapshot(
             GameId: GameId.ToString(),
             Schema: "uya.map-id.v1",
-            Payload: new UyaMapIdGameData(
+            Payload: new UyaMpGameData(
                 CurrentMapId: currentMapId,
                 IsAvailable: currentMapId.HasValue,
-                PlayerPosition: playerPosition));
+                PlayerPosition: playerPosition,
+                MobyList: mobyList));
     }
 }
