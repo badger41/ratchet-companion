@@ -6,7 +6,13 @@ public sealed record Pcsx2StatusSnapshot(
     string Backend,
     Pcsx2ConnectionState Connection,
     GameDetectionResult Detection,
-    GameModuleSummary? Module);
+    GameModuleSummary? Module,
+    GameDataSnapshot? GameData = null);
+
+public sealed record GameDataSnapshot(
+    string GameId,
+    string Schema,
+    object Payload);
 
 public sealed record GameModuleSummary(
     string GameId,

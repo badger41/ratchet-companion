@@ -8,4 +8,6 @@ public interface IPcsx2Runtime
     Task DisconnectAsync(CancellationToken cancellationToken = default);
     Task<Pcsx2ConnectionState> GetConnectionStateAsync(CancellationToken cancellationToken = default);
     Task<GameDetectionResult> DetectGameAsync(CancellationToken cancellationToken = default);
+    Task<uint?> ReadUInt32Async(uint address, CancellationToken cancellationToken = default);
+    Task<byte[]?> ReadMemoryAsync(uint address, int byteCount, CancellationToken cancellationToken = default);
 }

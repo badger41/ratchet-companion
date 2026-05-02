@@ -13,8 +13,13 @@ public static class ServiceCollectionExtensions
         services.Configure<Pcsx2Options>(configuration.GetSection("PCSX2"));
         services.AddSingleton(sp => sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<Pcsx2Options>>().Value);
         services.AddSingleton<Pcsx2ProcessLocator>();
+        services.AddSingleton<LinuxPcsx2ProcessMemoryReader>();
+        services.AddSingleton<WindowsPcsx2ProcessMemoryReader>();
         services.AddSingleton<PineProbeClient>();
         services.AddSingleton<PineGameInfoClient>();
+        services.AddSingleton<Pcsx2MemoryWatchService>();
+        services.AddSingleton<IWatchedMemoryTracker>(sp => sp.GetRequiredService<Pcsx2MemoryWatchService>());
+        services.AddHostedService(sp => sp.GetRequiredService<Pcsx2MemoryWatchService>());
         services.AddSingleton<IPcsx2Runtime, Pcsx2Runtime>();
         return services;
     }

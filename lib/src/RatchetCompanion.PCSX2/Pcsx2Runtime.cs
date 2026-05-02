@@ -7,8 +7,9 @@ namespace RatchetCompanion.PCSX2;
 
 public sealed class Pcsx2Runtime(
     Pcsx2ProcessLocator processLocator,
-    PineProbeClient pineProbeClient,
-    PineGameInfoClient pineGameInfoClient) : IPcsx2Runtime
+    PineGameInfoClient pineGameInfoClient,
+    LinuxPcsx2ProcessMemoryReader linuxProcessMemoryReader,
+    WindowsPcsx2ProcessMemoryReader windowsProcessMemoryReader) : IPcsx2Runtime
 {
     private volatile bool _isSessionActive;
     private volatile bool _isManuallyDisconnected;
@@ -22,17 +23,18 @@ public sealed class Pcsx2Runtime(
     }
 
     public Task DisconnectAsync(CancellationToken cancellationToken = default)
-    {
-        _isManuallyDisconnected = true;
-        _isSessionActive = false;
-        return Task.CompletedTask;
-    }
+        => DisconnectCoreAsync(cancellationToken);
 
     public async Task<Pcsx2ConnectionState> GetConnectionStateAsync(CancellationToken cancellationToken = default)
     {
         var process = processLocator.FindRunningProcess();
-        var pineResult = await pineProbeClient.ProbeAsync(cancellationToken);
-        var isPineAvailable = pineResult.IsReachable;
+        var isPineAvailable = false;
+
+        if (!_isManuallyDisconnected)
+        {
+            var pineResult = await pineGameInfoClient.GetConnectionStatusAsync(cancellationToken);
+            isPineAvailable = pineResult.IsReachable;
+        }
 
         if (_isManuallyDisconnected)
         {
@@ -59,6 +61,68 @@ public sealed class Pcsx2Runtime(
 
     public Task<GameDetectionResult> DetectGameAsync(CancellationToken cancellationToken = default)
         => DetectGameCoreAsync(cancellationToken);
+
+    public async Task<uint?> ReadUInt32Async(uint address, CancellationToken cancellationToken = default)
+    {
+        if (_isManuallyDisconnected)
+        {
+            return null;
+        }
+
+        var result = await pineGameInfoClient.QueryUInt32Async(address, cancellationToken);
+        return result.IsSuccessful ? result.Value : null;
+    }
+
+    private async Task DisconnectCoreAsync(CancellationToken cancellationToken)
+    {
+        _isManuallyDisconnected = true;
+        _isSessionActive = false;
+        await pineGameInfoClient.DisconnectAsync(cancellationToken);
+    }
+
+    public async Task<byte[]?> ReadMemoryAsync(uint address, int byteCount, CancellationToken cancellationToken = default)
+    {
+        if (_isManuallyDisconnected)
+        {
+            return null;
+        }
+
+        if (byteCount <= 0)
+        {
+            return [];
+        }
+
+        if (OperatingSystem.IsLinux())
+        {
+            return await linuxProcessMemoryReader.ReadEeMemoryAsync(address, byteCount, cancellationToken);
+        }
+
+        if (OperatingSystem.IsWindows())
+        {
+            return await windowsProcessMemoryReader.ReadEeMemoryAsync(address, byteCount, cancellationToken);
+        }
+
+        var buffer = new byte[byteCount];
+        var bytesRead = 0;
+
+        while (bytesRead < byteCount)
+        {
+            var chunkAddress = address + (uint)bytesRead;
+            var chunkValue = await ReadUInt32Async(chunkAddress, cancellationToken);
+
+            if (!chunkValue.HasValue)
+            {
+                return null;
+            }
+
+            var chunkBytes = BitConverter.GetBytes(chunkValue.Value);
+            var bytesToCopy = Math.Min(sizeof(uint), byteCount - bytesRead);
+            Array.Copy(chunkBytes, 0, buffer, bytesRead, bytesToCopy);
+            bytesRead += bytesToCopy;
+        }
+
+        return buffer;
+    }
 
     private async Task<GameDetectionResult> DetectGameCoreAsync(CancellationToken cancellationToken)
     {

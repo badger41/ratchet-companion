@@ -44,6 +44,7 @@ var websocketJsonOptions = new JsonSerializerOptions
 {
     PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
 };
+var websocketStatusInterval = TimeSpan.FromMilliseconds(250);
 
 app.UseCors();
 app.UseWebSockets();
@@ -58,9 +59,8 @@ app.MapGet("/api/modules", (IGameModuleRegistry registry) =>
         module.Capabilities,
     })));
 
-app.MapGet("/api/status", async (IPcsx2Runtime pcsx2Runtime, IGameModuleRegistry registry, CancellationToken cancellationToken) =>
+app.MapGet("/api/status", async (StatusSnapshotFactory snapshotFactory, CancellationToken cancellationToken) =>
 {
-    var snapshotFactory = new StatusSnapshotFactory(pcsx2Runtime, registry);
     var snapshot = await snapshotFactory.CreateAsync(cancellationToken);
     return Results.Ok(snapshot);
 });
@@ -87,15 +87,30 @@ app.Map("/ws/status", async (HttpContext context, StatusSnapshotFactory snapshot
 
     using var webSocket = await context.WebSockets.AcceptWebSocketAsync();
     var cancellationToken = context.RequestAborted;
+    var watchedMemoryTracker = context.RequestServices.GetRequiredService<IWatchedMemoryTracker>();
+    var lastObservedVersion = watchedMemoryTracker.CurrentVersion;
+    string? lastSentJson = null;
 
     while (!cancellationToken.IsCancellationRequested && webSocket.State == WebSocketState.Open)
     {
         var snapshot = await snapshotFactory.CreateAsync(cancellationToken);
         var json = JsonSerializer.Serialize(snapshot, websocketJsonOptions);
-        var payload = System.Text.Encoding.UTF8.GetBytes(json);
 
-        await webSocket.SendAsync(payload, WebSocketMessageType.Text, true, cancellationToken);
-        await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+        if (!string.Equals(lastSentJson, json, StringComparison.Ordinal))
+        {
+            var payload = System.Text.Encoding.UTF8.GetBytes(json);
+            await webSocket.SendAsync(payload, WebSocketMessageType.Text, true, cancellationToken);
+            lastSentJson = json;
+        }
+
+        try
+        {
+            lastObservedVersion = await watchedMemoryTracker.WaitForChangeAsync(lastObservedVersion, cancellationToken)
+                .WaitAsync(websocketStatusInterval, cancellationToken);
+        }
+        catch (TimeoutException)
+        {
+        }
     }
 });
 

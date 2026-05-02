@@ -3,7 +3,9 @@ using RatchetCompanion.Core.PCSX2;
 
 namespace RatchetCompanion.Host;
 
-public sealed class StatusSnapshotFactory(IPcsx2Runtime pcsx2Runtime, IGameModuleRegistry gameModuleRegistry)
+public sealed class StatusSnapshotFactory(
+    IPcsx2Runtime pcsx2Runtime,
+    IGameModuleRegistry gameModuleRegistry)
 {
     public async Task<Pcsx2StatusSnapshot> CreateAsync(CancellationToken cancellationToken = default)
     {
@@ -22,6 +24,9 @@ public sealed class StatusSnapshotFactory(IPcsx2Runtime pcsx2Runtime, IGameModul
         }
 
         var module = gameModuleRegistry.Get(detection.GameId);
+        var gameData = module is IGameDataSnapshotProvider snapshotProvider
+            ? await snapshotProvider.CreateSnapshotAsync(cancellationToken)
+            : null;
 
         return new Pcsx2StatusSnapshot(
             Backend: "RatchetCompanion.Host",
@@ -32,6 +37,7 @@ public sealed class StatusSnapshotFactory(IPcsx2Runtime pcsx2Runtime, IGameModul
                 : new GameModuleSummary(
                     GameId: module.GameId.ToString(),
                     DisplayName: module.DisplayName,
-                    Capabilities: module.Capabilities));
+                    Capabilities: module.Capabilities),
+            GameData: gameData);
     }
 }

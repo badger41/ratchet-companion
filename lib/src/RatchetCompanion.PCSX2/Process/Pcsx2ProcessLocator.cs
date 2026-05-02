@@ -5,13 +5,16 @@ namespace RatchetCompanion.PCSX2.Process;
 public sealed class Pcsx2ProcessLocator(Pcsx2Options options)
 {
     public System.Diagnostics.Process? FindRunningProcess()
+        => FindRunningProcesses().FirstOrDefault();
+
+    public IReadOnlyList<System.Diagnostics.Process> FindRunningProcesses()
     {
         var candidates = System.Diagnostics.Process.GetProcesses()
             .Where(IsPcsx2Process)
             .OrderByDescending(GetProcessStartTimeOrMinValue)
             .ToArray();
 
-        return candidates.FirstOrDefault();
+        return candidates;
     }
 
     private bool IsPcsx2Process(System.Diagnostics.Process process)

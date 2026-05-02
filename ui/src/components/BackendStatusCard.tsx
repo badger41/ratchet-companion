@@ -1,4 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
+import { PlayerCard } from './PlayerCard'
+
+type PlayerPosition = {
+  x: number
+  y: number
+  z: number
+}
 
 type StatusResponse = {
   backend: string
@@ -10,7 +17,7 @@ type StatusResponse = {
     processId: number | null
   }
   detection: {
-    gameId: string
+    gameId: string | number
     displayName: string
     version: { region: string; build: string } | null
     isSupported: boolean
@@ -20,6 +27,11 @@ type StatusResponse = {
     displayName: string
     capabilities: string[]
   } | null
+  gameData?: {
+    gameId: string
+    schema: string
+    payload: Record<string, any>
+  } | null
 }
 
 function normalizeStatusResponse(input: unknown): StatusResponse {
@@ -28,6 +40,7 @@ function normalizeStatusResponse(input: unknown): StatusResponse {
   const detection = (source.detection ?? source.Detection ?? {}) as Record<string, any>
   const version = (detection.version ?? detection.Version ?? null) as Record<string, any> | null
   const module = (source.module ?? source.Module ?? null) as Record<string, any> | null
+  const gameData = (source.gameData ?? source.GameData ?? null) as Record<string, any> | null
 
   return {
     backend: source.backend ?? source.Backend ?? 'Unknown',
@@ -54,6 +67,13 @@ function normalizeStatusResponse(input: unknown): StatusResponse {
           gameId: module.gameId ?? module.GameId ?? 'Unknown',
           displayName: module.displayName ?? module.DisplayName ?? 'Unknown',
           capabilities: module.capabilities ?? module.Capabilities ?? [],
+        }
+      : null,
+    gameData: gameData
+      ? {
+          gameId: gameData.gameId ?? gameData.GameId ?? 'Unknown',
+          schema: gameData.schema ?? gameData.Schema ?? 'Unknown',
+          payload: (gameData.payload ?? gameData.Payload ?? {}) as Record<string, any>,
         }
       : null,
   }
@@ -87,6 +107,17 @@ export function BackendStatusCard() {
   const isConnectedToPine = status?.connection?.isConnectedToPine ?? false
   const loadedGame = status?.detection?.displayName ?? 'No title detected'
   const discSerial = status?.detection?.version?.build ?? 'No serial'
+  const uyaMapId = status?.gameData?.schema === 'uya.map-id.v1' && status.gameData.payload.isAvailable
+    ? (status.gameData.payload.currentMapId ?? null)
+    : null
+  const uyaPlayerPosition = status?.gameData?.schema === 'uya.map-id.v1' && status.gameData.payload.playerPosition
+    ? {
+        x: Number(status.gameData.payload.playerPosition.x ?? status.gameData.payload.playerPosition.X ?? NaN),
+        y: Number(status.gameData.payload.playerPosition.y ?? status.gameData.payload.playerPosition.Y ?? NaN),
+        z: Number(status.gameData.payload.playerPosition.z ?? status.gameData.payload.playerPosition.Z ?? NaN),
+      } satisfies PlayerPosition
+    : null
+  const isUyaGame = `${status?.detection?.gameId ?? 'Unknown'}` === '3' || status?.detection?.gameId === 'UYA'
 
   const websocketUrl = useMemo(() => backendBaseUrl.replace('http://', 'ws://') + '/ws/status', [])
 
@@ -181,7 +212,22 @@ export function BackendStatusCard() {
           <span className="game-status-separator">-</span>
           <span className="game-status-title">{loadedGame}</span>
         </div>
+
+        {isUyaGame ? (
+          <>
+            <div className="status-divider" aria-hidden="true" />
+            <div
+              className="status-pill"
+              title={uyaMapId !== null ? `Current map id: ${uyaMapId}` : 'Current map id unavailable'}
+            >
+              <span className="status-pill-label">Map</span>
+              <span className="status-value">{uyaMapId ?? '—'}</span>
+            </div>
+          </>
+        ) : null}
       </div>
+
+      {isUyaGame ? <PlayerCard title="Local Player" position={uyaPlayerPosition} /> : null}
 
       {error ? <p className="error">Unable to query backend: {error}</p> : null}
     </section>
