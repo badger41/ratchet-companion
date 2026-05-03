@@ -7,4 +7,5 @@ public sealed class Pcsx2Options
     public int PinePort { get; init; } = 28011;
     public string? PineSocketPath { get; init; }
     public int PineTimeoutMilliseconds { get; init; } = 250;
+    public int MemoryPollingMilliseconds { get; init; } = 250;
 }

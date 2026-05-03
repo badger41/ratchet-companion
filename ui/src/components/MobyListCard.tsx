@@ -71,26 +71,29 @@ export function MobyListCard({
   ];
 
   return (
-    <div id="temp-wrapper" style={{
-      maxHeight: "75vh",
-      overflow: 'auto'
-    }}>
+    <div
+      id="temp-wrapper"
+      style={{
+        maxHeight: '75vh',
+        overflow: 'auto',
+      }}
+    >
       <Table
         variant="container"
         stickyHeader
         header={
-                  <Header
-          variant="h2"
-          headingTagOverride="h3"
-          counter={
-            <Badge color={visibleMobys.length > 0 ? 'green' : 'grey'}>
-              {visibleMobys.length}
-            </Badge>
-          }
-          description="Live Moby summaries grouped by allocation type."
-        >
-          {title}
-        </Header>
+          <Header
+            variant="h2"
+            headingTagOverride="h3"
+            counter={
+              <Badge color={visibleMobys.length > 0 ? 'green' : 'grey'}>
+                {visibleMobys.length}
+              </Badge>
+            }
+            description="Live Moby summaries grouped by allocation type."
+          >
+            {title}
+          </Header>
         }
         filter={
           <Tabs

@@ -4,12 +4,11 @@ using RatchetCompanion.Core.PCSX2;
 
 namespace RatchetCompanion.PCSX2;
 
-public sealed class Pcsx2MemoryWatchService(IPcsx2Runtime pcsx2Runtime) : BackgroundService, IWatchedMemoryTracker
+public sealed class Pcsx2MemoryWatchService(IPcsx2Runtime pcsx2Runtime, Pcsx2Options options) : BackgroundService, IWatchedMemoryTracker
 {
-    private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(250);
-
     private readonly ConcurrentDictionary<string, UInt32WatchState> _uint32Watches = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, MemoryWatchState> _memoryWatches = new(StringComparer.Ordinal);
+    private readonly TimeSpan _pollInterval = TimeSpan.FromMilliseconds(options.MemoryPollingMilliseconds);
     private readonly object _notificationGate = new();
     private long _changeVersion;
     private TaskCompletionSource<long> _nextChangeTcs = CreateSignal();
@@ -83,7 +82,7 @@ public sealed class Pcsx2MemoryWatchService(IPcsx2Runtime pcsx2Runtime) : Backgr
                 }
             }
 
-            await Task.Delay(PollInterval, stoppingToken);
+            await Task.Delay(_pollInterval, stoppingToken);
         }
     }
 

@@ -1,5 +1,14 @@
-import { contextBridge } from 'electron'
+import { contextBridge } from 'electron';
+import { defaultBackendBaseUrl } from './backendConfig.cjs';
+
+function getBackendBaseUrl() {
+  const argument = process.argv.find((value) =>
+    value.startsWith('--ratchet-backend-base-url='),
+  );
+
+  return argument?.split('=')[1] || defaultBackendBaseUrl;
+}
 
 contextBridge.exposeInMainWorld('ratchetCompanion', {
-  backendBaseUrl: 'http://127.0.0.1:48123',
-})
+  backendBaseUrl: getBackendBaseUrl(),
+});

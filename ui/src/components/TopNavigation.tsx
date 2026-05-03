@@ -9,6 +9,7 @@ type AppTopNavigationProps = {
   error: string | null;
   isPending: boolean;
   onToggleConnection: () => void;
+  onOpenSettings: () => void;
 };
 
 export function AppTopNavigation({
@@ -16,6 +17,7 @@ export function AppTopNavigation({
   error,
   isPending,
   onToggleConnection,
+  onOpenSettings,
 }: AppTopNavigationProps) {
   const isSessionActive = status?.connection.isSessionActive ?? false;
   const isProcessRunning = status?.connection.isProcessRunning ?? false;
@@ -78,6 +80,15 @@ export function AppTopNavigation({
       disableTextCollapse: true,
     });
   }
+
+  utilities.push({
+    type: 'button',
+    iconName: 'settings',
+    text: 'Settings',
+    ariaLabel: 'Open settings',
+    disableTextCollapse: true,
+    onClick: onOpenSettings,
+  });
 
   utilities.push({
     type: 'button',

@@ -1,5 +1,7 @@
+import { defaultBackendBaseUrl } from './backendDefaults';
+
 export function getBackendBaseUrl() {
-  return window.ratchetCompanion?.backendBaseUrl ?? 'http://127.0.0.1:48123';
+  return window.ratchetCompanion?.backendBaseUrl ?? defaultBackendBaseUrl;
 }
 
 export function getStatusWebsocketUrl(baseUrl: string) {

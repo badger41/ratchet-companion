@@ -22,7 +22,9 @@
   "win": {
     "signAndEditExecutable": false,
     "target": [
-      "portable"
+      "portable",
+      "zip",
+      "dir"
     ],
     "artifactName": "${productName}-${version}-${arch}.${ext}"
   }

@@ -14,8 +14,8 @@
     "build:all": "npm run build && npm run build:electron",
     "start": "env -u ELECTRON_RUN_AS_NODE electron .",
     "lint": "eslint .",
-    "format": "prettier \"src/**/*.{ts,tsx,css}\" \"eslint.config.js\" \".prettierrc\" --write",
-    "format:check": "prettier \"src/**/*.{ts,tsx,css}\" \"eslint.config.js\" \".prettierrc\" --check",
+    "format": "prettier \"src/**/*.{ts,tsx,css}\" \"electron/**/*.{ts,cts}\" \"eslint.config.js\" \".prettierrc\" --write",
+    "format:check": "prettier \"src/**/*.{ts,tsx,css}\" \"electron/**/*.{ts,cts}\" \"eslint.config.js\" \".prettierrc\" --check",
     "preview": "vite preview"
   },
   "dependencies": {
