@@ -9,6 +9,7 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddUYAModule(this IServiceCollection services)
     {
         services.AddSingleton<UyaMemoryExample>();
+        services.AddSingleton<UyaMpPvarOverlay>();
         services.AddSingleton<UyaMpPlayerMemory>();
         services.AddSingleton<UyaMpMobyMemory>();
         services.AddSingleton<IGameModule, UyaGameModule>();

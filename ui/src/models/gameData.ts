@@ -8,4 +8,11 @@ export type MobySummary = {
   pointer: number;
   oClass: number;
   isDynamic: boolean;
+  pvar: MobyPvarSummary | null;
+};
+
+export type MobyPvarSummary = {
+  pointer: number;
+  byteCount: number;
+  name: string;
 };

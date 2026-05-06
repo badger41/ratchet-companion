@@ -14,6 +14,7 @@ type MemoryBlockMessage = {
 
 type MemoryBlockSnapshot = {
   address: number;
+  byteCount: number;
   bytes: Uint8Array | null;
   error: string | null;
 };
@@ -34,53 +35,89 @@ export function useMemoryBlock(
       return;
     }
 
+    let isActive = true;
     const socket = new WebSocket(
       getMemoryWebsocketUrl(backendBaseUrl, address, byteCount),
     );
 
     socket.onmessage = ({ data }: { data: string }) => {
+      if (!isActive) {
+        return;
+      }
+
       try {
         const payload = JSON.parse(data) as MemoryBlockMessage;
-        setSnapshot({
-          address,
-          bytes: payload.bytes ? decodeBase64(payload.bytes) : null,
-          error: null,
+        if (payload.address !== address || payload.byteCount !== byteCount) {
+          return;
+        }
+
+        setSnapshot((current) => {
+          const decodedBytes = payload.bytes
+            ? decodeBase64(payload.bytes)
+            : null;
+          const isCurrentBlock =
+            current?.address === address && current.byteCount === byteCount;
+
+          return {
+            address,
+            byteCount,
+            bytes: decodedBytes ?? (isCurrentBlock ? current.bytes : null),
+            error: null,
+          };
         });
       } catch (err) {
-        setSnapshot({
+        setSnapshot((current) => ({
           address,
-          bytes: null,
+          byteCount,
+          bytes:
+            current?.address === address && current.byteCount === byteCount
+              ? current.bytes
+              : null,
           error: err instanceof Error ? err.message : 'Unknown memory payload',
-        });
+        }));
       }
     };
 
     socket.onerror = () => {
-      setSnapshot({
+      if (!isActive) {
+        return;
+      }
+
+      setSnapshot((current) => ({
         address,
-        bytes: null,
+        byteCount,
+        bytes:
+          current?.address === address && current.byteCount === byteCount
+            ? current.bytes
+            : null,
         error: 'Memory WebSocket connection failed',
-      });
+      }));
     };
 
     socket.onclose = () => {
+      if (!isActive) {
+        return;
+      }
+
       setSnapshot((current) =>
-        current?.address === address && current.error
-          ? current
+        current?.address === address && current.byteCount === byteCount
+          ? { ...current, error: null }
           : {
               address,
+              byteCount,
               bytes: null,
-              error: 'Memory WebSocket disconnected',
+              error: null,
             },
       );
     };
 
     return () => {
+      isActive = false;
       socket.close();
     };
   }, [address, byteCount]);
 
-  return snapshot?.address === address
+  return snapshot?.address === address && snapshot.byteCount === byteCount
     ? { bytes: snapshot.bytes, error: snapshot.error }
     : { bytes: null, error: null };
 }
