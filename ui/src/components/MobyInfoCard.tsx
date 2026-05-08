@@ -18,7 +18,7 @@ import { useMemoryBlock } from '../hooks/useMemoryBlock';
 import type { MobySummary } from '../models/gameData';
 import { mobyMemoryByteCount, parseMobyMemory } from '../models/mobyMemory';
 import { formatCoordinate, formatPointer } from '../utils/format';
-import { HexByteView } from './HexByteView';
+import { HexByteView, type HexByteHighlightRange } from './HexByteView';
 
 const UYA_PVAR_OVERLAY_VERSION = 3;
 type PvarViewMode = 'overlay' | 'raw';
@@ -41,6 +41,10 @@ export function MobyInfoCard({ moby }: MobyInfoCardProps) {
   const pvarFields = useMemo(
     () => getPvarOverlayFields(moby?.oClass ?? 0, UYA_PVAR_OVERLAY_VERSION),
     [moby?.oClass],
+  );
+  const pvarHighlights = useMemo(
+    () => createPvarHighlights(pvarFields),
+    [pvarFields],
   );
 
   if (!moby) {
@@ -108,6 +112,7 @@ export function MobyInfoCard({ moby }: MobyInfoCardProps) {
           createPvarTab(
             moby,
             pvarFields,
+            pvarHighlights,
             pvarBytes,
             pvarError,
             pvarViewMode,
@@ -122,6 +127,7 @@ export function MobyInfoCard({ moby }: MobyInfoCardProps) {
 function createPvarTab(
   moby: MobySummary,
   fields: ReturnType<typeof getPvarOverlayFields>,
+  highlights: HexByteHighlightRange[],
   bytes: Uint8Array | null,
   error: string | null,
   viewMode: PvarViewMode,
@@ -163,7 +169,7 @@ function createPvarTab(
             {viewMode === 'overlay' ? (
               <PvarOverlayFields fields={fields} bytes={bytes} />
             ) : (
-              <HexByteView bytes={bytes} />
+              <HexByteView bytes={bytes} highlights={highlights} />
             )}
           </SpaceBetween>
         )}
@@ -240,6 +246,28 @@ function formatPvarFieldValue(
   return `0x${Array.from(fieldBytes)
     .map((byte) => byte.toString(16).toUpperCase().padStart(2, '0'))
     .join('')}`;
+}
+
+function createPvarHighlights(
+  fields: ReturnType<typeof getPvarOverlayFields>,
+): HexByteHighlightRange[] {
+  return fields
+    .filter(
+      (
+        field,
+      ): field is ReturnType<typeof getPvarOverlayFields>[number] &
+        Required<
+          Pick<
+            ReturnType<typeof getPvarOverlayFields>[number],
+            'Name' | 'Offset'
+          >
+        > => typeof field.Name === 'string' && typeof field.Offset === 'number',
+    )
+    .map((field) => ({
+      offset: field.Offset,
+      byteCount: getPvarFieldByteCount(field),
+      label: field.Name,
+    }));
 }
 
 function getPvarFieldByteCount(
