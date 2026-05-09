@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 
 const backendUrl = 'http://127.0.0.1:48123/api/health'
 const rendererUrl = 'http://127.0.0.1:5173/'
@@ -7,6 +7,7 @@ const electronCommand =
   isWindows
     ? '.\\node_modules\\.bin\\electron.cmd'
     : './node_modules/.bin/electron'
+const npmCommand = 'npm'
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -26,9 +27,28 @@ async function waitFor(url, label, attempts = 60) {
   throw new Error(`Timed out waiting for ${label}`)
 }
 
+function buildElectronMain() {
+  console.log('[dev:electron] building Electron main process')
+
+  const result = spawnSync(npmCommand, ['run', 'build:electron'], {
+    stdio: 'inherit',
+    shell: isWindows,
+  })
+
+  if (result.error) {
+    throw result.error
+  }
+
+  if (result.status !== 0) {
+    throw new Error(`Electron main build failed with exit code ${result.status ?? 'unknown'}`)
+  }
+}
+
 try {
   console.log('[dev:electron] starting preflight')
   console.log(`[dev:electron] ELECTRON_RUN_AS_NODE=${process.env.ELECTRON_RUN_AS_NODE ?? '<unset>'}`)
+
+  buildElectronMain()
 
   await waitFor('http://127.0.0.1:5173', 'renderer')
   await waitFor(backendUrl, 'backend')
