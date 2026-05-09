@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process'
+import fs from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -13,6 +14,7 @@ const isFrameworkDependentBuild = process.argv.includes('--framework-dependent')
 const releaseDirectory = isFrameworkDependentBuild
   ? path.join(buildRoot, 'release-win-framework')
   : path.join(buildRoot, 'release-win')
+const isWindows = process.platform === 'win32'
 
 function run(command, args, options = {}) {
   return new Promise((resolve, reject) => {
@@ -20,6 +22,7 @@ function run(command, args, options = {}) {
       cwd: options.cwd ?? repoRoot,
       stdio: 'inherit',
       env: options.env ?? process.env,
+      shell: isWindows,
     })
 
     child.on('exit', (code) => {
@@ -35,7 +38,7 @@ function run(command, args, options = {}) {
   })
 }
 
-await run('mkdir', ['-p', backendOutput])
+await fs.mkdir(backendOutput, { recursive: true })
 
 await run('dotnet', [
   'publish',
