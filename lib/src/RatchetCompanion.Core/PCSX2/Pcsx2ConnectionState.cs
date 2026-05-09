@@ -5,4 +5,6 @@ public sealed record Pcsx2ConnectionState(
     bool IsProcessRunning,
     bool IsConnectedToPine,
     string? ProcessName,
-    int? ProcessId);
+    int? ProcessId,
+    string? PineEndpoint = null,
+    string? PineFailureReason = null);

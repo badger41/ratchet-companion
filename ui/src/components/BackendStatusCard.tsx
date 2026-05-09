@@ -11,7 +11,8 @@ import type { MobySummary } from '../models/gameData';
 import type { StatusResponse } from '../models/backendStatus';
 import {
   getNumericGameId,
-  getUyaMapSnapshot,
+  getRatchetMapSnapshot,
+  isRatchetMobyStatus,
   isUyaStatus,
 } from '../models/uyaMapSnapshot';
 
@@ -26,12 +27,14 @@ export function BackendStatusCard({ status, error }: BackendStatusCardProps) {
   );
   const detectionGameId = getNumericGameId(status);
   const isUyaGame = isUyaStatus(status);
-  const uyaSnapshot = getUyaMapSnapshot(status);
+  const hasMobySnapshot = isRatchetMobyStatus(status);
+  const ratchetSnapshot = getRatchetMapSnapshot(status);
   const selectedMoby = useMemo(
     () =>
-      uyaSnapshot?.mobys.find((moby) => moby.pointer === selectedMobyPointer) ??
-      null,
-    [selectedMobyPointer, uyaSnapshot?.mobys],
+      ratchetSnapshot?.mobys.find(
+        (moby) => moby.pointer === selectedMobyPointer,
+      ) ?? null,
+    [selectedMobyPointer, ratchetSnapshot?.mobys],
   );
 
   return (
@@ -43,21 +46,24 @@ export function BackendStatusCard({ status, error }: BackendStatusCardProps) {
       {isUyaGame ? (
         <PlayerCard
           title="Local Player"
-          position={uyaSnapshot?.playerPosition ?? null}
+          position={ratchetSnapshot?.playerPosition ?? null}
         />
       ) : null}
-      {isUyaGame ? (
+      {hasMobySnapshot ? (
         <ColumnLayout columns={selectedMoby ? 2 : 1}>
           <MobyListCard
             title="Mobys"
-            mobys={uyaSnapshot?.mobys ?? []}
+            mobys={ratchetSnapshot?.mobys ?? []}
             gameId={detectionGameId}
+            showAllocationTabs={detectionGameId !== 4}
             selectedMoby={selectedMoby}
             onSelectedMobyChange={(moby: MobySummary | null) =>
               setSelectedMobyPointer(moby?.pointer ?? null)
             }
           />
-          {selectedMoby ? <MobyInfoCard moby={selectedMoby} /> : null}
+          {selectedMoby ? (
+            <MobyInfoCard moby={selectedMoby} gameId={detectionGameId} />
+          ) : null}
         </ColumnLayout>
       ) : null}
     </SpaceBetween>

@@ -8,6 +8,8 @@ export type StatusResponse = {
     isConnectedToPine: boolean;
     processName: string | null;
     processId: number | null;
+    pineEndpoint?: string | null;
+    pineFailureReason?: string | null;
   };
   detection: {
     gameId: string | number;

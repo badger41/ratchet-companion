@@ -15,6 +15,13 @@ export function isUyaStatus(status: StatusResponse | null) {
   return gameId === UYA_GAME_ID || gameId === UYA_GAME_KEY;
 }
 
+export function isRatchetMobyStatus(status: StatusResponse | null) {
+  return (
+    status?.gameData?.schema === 'uya.map-id.v1' ||
+    status?.gameData?.schema === 'dl.mp.mobys.v1'
+  );
+}
+
 export function getNumericGameId(status: StatusResponse | null) {
   return Number(status?.detection.gameId ?? 0);
 }
@@ -35,4 +42,24 @@ export function getUyaMapSnapshot(
     playerPosition: payload.playerPosition,
     mobys: payload.mobyList?.mobys ?? [],
   };
+}
+
+export function getRatchetMapSnapshot(
+  status: StatusResponse | null,
+): UyaMapSnapshot | null {
+  if (status?.gameData?.schema === 'uya.map-id.v1') {
+    return getUyaMapSnapshot(status);
+  }
+
+  if (status?.gameData?.schema === 'dl.mp.mobys.v1') {
+    const payload = status.gameData.payload;
+
+    return {
+      currentMapId: null,
+      playerPosition: null,
+      mobys: payload.mobyList?.mobys ?? [],
+    };
+  }
+
+  return null;
 }

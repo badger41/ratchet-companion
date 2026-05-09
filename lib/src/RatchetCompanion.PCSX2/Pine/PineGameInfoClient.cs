@@ -8,11 +8,15 @@ public sealed class PineGameInfoClient(Pcsx2Options options)
     private const byte MsgRead32 = 0x02;
     private const byte MsgTitle = 0x0B;
     private const byte MsgId = 0x0C;
+    private const byte MsgStatus = 0x0F;
+    private const int MinimumQueryTimeoutMilliseconds = 1000;
 
     private readonly SemaphoreSlim _gate = new(1, 1);
     private TcpClient? _tcpClient;
     private Socket? _unixSocket;
     private NetworkStream? _stream;
+    private string? _connectedEndpointLabel;
+    private string? _lastAttemptedEndpointLabel;
 
     public Task<PineStringQueryResult> QueryTitleAsync(CancellationToken cancellationToken = default)
         => QueryStringAsync(MsgTitle, cancellationToken);
@@ -23,22 +27,57 @@ public sealed class PineGameInfoClient(Pcsx2Options options)
     public Task<PineUInt32QueryResult> QueryUInt32Async(uint address, CancellationToken cancellationToken = default)
         => QueryUInt32CoreAsync(address, cancellationToken);
 
+    public Task<PineUInt32QueryResult> QueryStatusAsync(CancellationToken cancellationToken = default)
+        => QueryStatusCoreAsync(cancellationToken);
+
     public async Task<PineProbeResult> GetConnectionStatusAsync(CancellationToken cancellationToken = default)
     {
         await _gate.WaitAsync(cancellationToken);
 
         try
         {
-            var connected = await EnsureConnectedAsync(cancellationToken);
+            if (_stream is not null && IsConnectionAlive())
+            {
+                var currentStatus = await QueryStatusWithoutLockAsync(cancellationToken);
+                if (currentStatus.IsSuccessful)
+                {
+                    return new PineProbeResult(true, GetEndpointLabel(), null);
+                }
 
-            return connected
-                ? new PineProbeResult(true, GetEndpointLabel(), null)
-                : new PineProbeResult(false, GetEndpointLabel(), "Unable to connect to PINE.");
-        }
-        catch (Exception exception) when (exception is SocketException or IOException or OperationCanceledException)
-        {
-            await DisconnectCoreAsync();
-            return new PineProbeResult(false, GetEndpointLabel(), exception.Message);
+                await DisconnectCoreAsync();
+            }
+
+            PineProbeResult? lastFailure = null;
+
+            foreach (var endpoint in PineEndpointResolver.GetCandidates(options))
+            {
+                _lastAttemptedEndpointLabel = endpoint.Label;
+
+                try
+                {
+                    using var connectTimeoutCts = CreateConnectTimeout(cancellationToken);
+                    await ConnectToEndpointAsync(endpoint, connectTimeoutCts.Token);
+
+                    var status = await SendStatusQueryOnCurrentConnectionAsync(cancellationToken);
+                    if (status.IsSuccessful)
+                    {
+                        return new PineProbeResult(true, GetEndpointLabel(), null);
+                    }
+
+                    lastFailure = new PineProbeResult(
+                        false,
+                        endpoint.Label,
+                        status.FailureReason ?? "PINE did not respond to status query.");
+                }
+                catch (Exception exception) when (exception is SocketException or IOException or OperationCanceledException)
+                {
+                    lastFailure = new PineProbeResult(false, endpoint.Label, exception.Message);
+                }
+
+                await DisconnectCoreAsync();
+            }
+
+            return lastFailure ?? new PineProbeResult(false, GetEndpointLabel(), "No PINE endpoints were configured.");
         }
         finally
         {
@@ -71,8 +110,7 @@ public sealed class PineGameInfoClient(Pcsx2Options options)
                 return new PineStringQueryResult(false, null, "Unable to connect to PINE.");
             }
 
-            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            timeoutCts.CancelAfter(options.PineTimeoutMilliseconds);
+            using var timeoutCts = CreateQueryTimeout(cancellationToken);
             var request = BuildRequest(opcode);
             await _stream!.WriteAsync(request, timeoutCts.Token);
 
@@ -90,7 +128,7 @@ public sealed class PineGameInfoClient(Pcsx2Options options)
         catch (Exception exception) when (exception is SocketException or IOException or OperationCanceledException)
         {
             await DisconnectCoreAsync();
-            return new PineStringQueryResult(false, null, exception.Message);
+            return await RetryStringQueryOnceAsync(opcode, exception.Message, cancellationToken);
         }
         finally
         {
@@ -109,8 +147,7 @@ public sealed class PineGameInfoClient(Pcsx2Options options)
                 return new PineUInt32QueryResult(false, null, "Unable to connect to PINE.");
             }
 
-            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            timeoutCts.CancelAfter(options.PineTimeoutMilliseconds);
+            using var timeoutCts = CreateQueryTimeout(cancellationToken);
             var request = BuildReadUInt32Request(address);
             await _stream!.WriteAsync(request, timeoutCts.Token);
 
@@ -136,6 +173,38 @@ public sealed class PineGameInfoClient(Pcsx2Options options)
         }
     }
 
+    private async Task<PineUInt32QueryResult> QueryStatusCoreAsync(CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken);
+
+        try
+        {
+            return await QueryStatusWithoutLockAsync(cancellationToken);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    private async Task<PineUInt32QueryResult> QueryStatusWithoutLockAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (!await EnsureConnectedAsync(cancellationToken))
+            {
+                return new PineUInt32QueryResult(false, null, "Unable to connect to PINE.");
+            }
+
+            return await SendStatusQueryOnCurrentConnectionAsync(cancellationToken);
+        }
+        catch (Exception exception) when (exception is SocketException or IOException or OperationCanceledException)
+        {
+            await DisconnectCoreAsync();
+            return new PineUInt32QueryResult(false, null, exception.Message);
+        }
+    }
+
     private async Task<bool> EnsureConnectedAsync(CancellationToken cancellationToken)
     {
         if (_stream is not null && IsConnectionAlive())
@@ -145,25 +214,70 @@ public sealed class PineGameInfoClient(Pcsx2Options options)
 
         await DisconnectCoreAsync();
 
-        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeoutCts.CancelAfter(options.PineTimeoutMilliseconds);
+        Exception? lastException = null;
 
-        if (!string.IsNullOrWhiteSpace(options.PineSocketPath) && OperatingSystem.IsLinux())
+        foreach (var endpoint in PineEndpointResolver.GetCandidates(options))
+        {
+            _lastAttemptedEndpointLabel = endpoint.Label;
+
+            try
+            {
+                using var timeoutCts = CreateConnectTimeout(cancellationToken);
+                await ConnectToEndpointAsync(endpoint, timeoutCts.Token);
+                return true;
+            }
+            catch (Exception exception) when (exception is SocketException or IOException or OperationCanceledException)
+            {
+                lastException = exception;
+                await DisconnectCoreAsync();
+            }
+        }
+
+        if (lastException is not null)
+        {
+            throw lastException;
+        }
+
+        return false;
+    }
+
+    private async Task ConnectToEndpointAsync(PineEndpoint endpoint, CancellationToken cancellationToken)
+    {
+        if (endpoint.Kind is PineEndpointKind.UnixSocket)
         {
             var socket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
-            await socket.ConnectAsync(new UnixDomainSocketEndPoint(options.PineSocketPath), timeoutCts.Token);
+            await socket.ConnectAsync(new UnixDomainSocketEndPoint(endpoint.SocketPath!), cancellationToken);
 
             _unixSocket = socket;
             _stream = new NetworkStream(socket, ownsSocket: false);
-            return true;
+            _connectedEndpointLabel = endpoint.Label;
+            return;
         }
 
         var tcpClient = new TcpClient();
-        await tcpClient.ConnectAsync(options.PineHost, options.PinePort, timeoutCts.Token);
+        await tcpClient.ConnectAsync(options.PineHost, options.PinePort, cancellationToken);
 
         _tcpClient = tcpClient;
         _stream = tcpClient.GetStream();
-        return true;
+        _connectedEndpointLabel = endpoint.Label;
+    }
+
+    private async Task<PineUInt32QueryResult> SendStatusQueryOnCurrentConnectionAsync(CancellationToken cancellationToken)
+    {
+        using var timeoutCts = CreateQueryTimeout(cancellationToken);
+        var request = BuildRequest(MsgStatus);
+        await _stream!.WriteAsync(request, timeoutCts.Token);
+
+        var responseLengthBytes = await ReadExactlyAsync(_stream, 4, timeoutCts.Token);
+        var responseLength = BitConverter.ToUInt32(responseLengthBytes, 0);
+
+        if (responseLength < 9)
+        {
+            return new PineUInt32QueryResult(false, null, "PINE status response was shorter than expected.");
+        }
+
+        var payload = await ReadExactlyAsync(_stream, (int)responseLength - 4, timeoutCts.Token);
+        return ParseUInt32Payload(payload);
     }
 
     private bool IsConnectionAlive()
@@ -194,12 +308,12 @@ public sealed class PineGameInfoClient(Pcsx2Options options)
 
         _unixSocket?.Dispose();
         _unixSocket = null;
+
+        _connectedEndpointLabel = null;
     }
 
     private string GetEndpointLabel()
-        => !string.IsNullOrWhiteSpace(options.PineSocketPath) && OperatingSystem.IsLinux()
-            ? options.PineSocketPath
-            : $"{options.PineHost}:{options.PinePort}";
+        => _connectedEndpointLabel ?? _lastAttemptedEndpointLabel ?? PineEndpointResolver.GetCandidates(options).FirstOrDefault()?.Label ?? "PINE";
 
     private static byte[] BuildRequest(byte opcode)
     {
@@ -207,6 +321,54 @@ public sealed class PineGameInfoClient(Pcsx2Options options)
         BitConverter.GetBytes((uint)5).CopyTo(request, 0);
         request[4] = opcode;
         return request;
+    }
+
+    private async Task<PineStringQueryResult> RetryStringQueryOnceAsync(
+        byte opcode,
+        string firstFailureReason,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (!await EnsureConnectedAsync(cancellationToken))
+            {
+                return new PineStringQueryResult(false, null, firstFailureReason);
+            }
+
+            using var timeoutCts = CreateQueryTimeout(cancellationToken);
+            var request = BuildRequest(opcode);
+            await _stream!.WriteAsync(request, timeoutCts.Token);
+
+            var responseLengthBytes = await ReadExactlyAsync(_stream, 4, timeoutCts.Token);
+            var responseLength = BitConverter.ToUInt32(responseLengthBytes, 0);
+
+            if (responseLength < 5)
+            {
+                return new PineStringQueryResult(false, null, "PINE response was shorter than expected.");
+            }
+
+            var payload = await ReadExactlyAsync(_stream, (int)responseLength - 4, timeoutCts.Token);
+            return ParseStringPayload(payload);
+        }
+        catch (Exception exception) when (exception is SocketException or IOException or OperationCanceledException)
+        {
+            await DisconnectCoreAsync();
+            return new PineStringQueryResult(false, null, $"{firstFailureReason}; retry failed: {exception.Message}");
+        }
+    }
+
+    private CancellationTokenSource CreateQueryTimeout(CancellationToken cancellationToken)
+    {
+        var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutCts.CancelAfter(Math.Max(options.PineTimeoutMilliseconds, MinimumQueryTimeoutMilliseconds));
+        return timeoutCts;
+    }
+
+    private CancellationTokenSource CreateConnectTimeout(CancellationToken cancellationToken)
+    {
+        var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutCts.CancelAfter(options.PineTimeoutMilliseconds);
+        return timeoutCts;
     }
 
     private static byte[] BuildReadUInt32Request(uint address)

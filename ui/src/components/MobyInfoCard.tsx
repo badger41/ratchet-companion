@@ -16,18 +16,23 @@ import { useMemo, useState } from 'react';
 import { getPvarOverlayFields } from '../data/pvarOverlayLookup';
 import { useMemoryBlock } from '../hooks/useMemoryBlock';
 import type { MobySummary } from '../models/gameData';
-import { mobyMemoryByteCount, parseMobyMemory } from '../models/mobyMemory';
+import {
+  mobyMemoryByteCount,
+  parseMobyMemoryForGame,
+} from '../models/mobyMemory';
 import { formatCoordinate, formatPointer } from '../utils/format';
 import { HexByteView, type HexByteHighlightRange } from './HexByteView';
 
 const UYA_PVAR_OVERLAY_VERSION = 3;
+const DL_PVAR_OVERLAY_VERSION = 4;
 type PvarViewMode = 'overlay' | 'raw';
 
 type MobyInfoCardProps = {
   moby: MobySummary | null;
+  gameId: number;
 };
 
-export function MobyInfoCard({ moby }: MobyInfoCardProps) {
+export function MobyInfoCard({ moby, gameId }: MobyInfoCardProps) {
   const [pvarViewMode, setPvarViewMode] = useState<PvarViewMode>('overlay');
   const { bytes, error } = useMemoryBlock(
     moby?.pointer ?? null,
@@ -37,10 +42,15 @@ export function MobyInfoCard({ moby }: MobyInfoCardProps) {
     moby?.pvar?.pointer ?? null,
     moby?.pvar?.byteCount ?? 0,
   );
-  const memory = useMemo(() => parseMobyMemory(bytes), [bytes]);
+  const overlayVersion =
+    gameId === 4 ? DL_PVAR_OVERLAY_VERSION : UYA_PVAR_OVERLAY_VERSION;
+  const memory = useMemo(
+    () => parseMobyMemoryForGame(bytes, gameId),
+    [bytes, gameId],
+  );
   const pvarFields = useMemo(
-    () => getPvarOverlayFields(moby?.oClass ?? 0, UYA_PVAR_OVERLAY_VERSION),
-    [moby?.oClass],
+    () => getPvarOverlayFields(moby?.oClass ?? 0, overlayVersion),
+    [moby?.oClass, overlayVersion],
   );
   const pvarHighlights = useMemo(
     () => createPvarHighlights(pvarFields),

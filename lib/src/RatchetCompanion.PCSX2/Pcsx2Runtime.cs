@@ -18,7 +18,7 @@ public sealed class Pcsx2Runtime(
     {
         _isManuallyDisconnected = false;
         var state = await GetConnectionStateAsync(cancellationToken);
-        _isSessionActive = state.IsProcessRunning && state.IsConnectedToPine;
+        _isSessionActive = state.IsProcessRunning && (state.IsConnectedToPine || IsDreadZoneOnlineFallback(state));
         return _isSessionActive;
     }
 
@@ -29,10 +29,19 @@ public sealed class Pcsx2Runtime(
     {
         var process = processLocator.FindRunningProcess();
         var isPineAvailable = false;
+        PineProbeResult? pineResult = null;
+        var isDreadZoneOnlineProcess = process is not null && IsDreadZoneOnlineProcess(process);
 
-        if (!_isManuallyDisconnected)
+        if (!_isManuallyDisconnected && isDreadZoneOnlineProcess)
         {
-            var pineResult = await pineGameInfoClient.GetConnectionStatusAsync(cancellationToken);
+            pineResult = new PineProbeResult(
+                false,
+                "DreadZone Online",
+                "PINE check skipped because the launcher may hold the PCSX2 PINE connection.");
+        }
+        else if (!_isManuallyDisconnected)
+        {
+            pineResult = await pineGameInfoClient.GetConnectionStatusAsync(cancellationToken);
             isPineAvailable = pineResult.IsReachable;
         }
 
@@ -41,6 +50,10 @@ public sealed class Pcsx2Runtime(
             _isSessionActive = false;
         }
         else if (process is not null && isPineAvailable)
+        {
+            _isSessionActive = true;
+        }
+        else if (process is not null && isDreadZoneOnlineProcess)
         {
             _isSessionActive = true;
         }
@@ -54,7 +67,9 @@ public sealed class Pcsx2Runtime(
             IsProcessRunning: process is not null,
             IsConnectedToPine: _isManuallyDisconnected ? false : isPineAvailable,
             ProcessName: process?.ProcessName,
-            ProcessId: process?.Id);
+            ProcessId: process?.Id,
+            PineEndpoint: pineResult?.Endpoint,
+            PineFailureReason: pineResult?.FailureReason);
 
         return state;
     }
@@ -135,6 +150,12 @@ public sealed class Pcsx2Runtime(
                 IsSupported: false);
         }
 
+        var process = processLocator.FindRunningProcess();
+        if (process is not null && IsDreadZoneOnlineProcess(process))
+        {
+            return CreateDreadZoneOnlineDetectionResult();
+        }
+
         var titleResult = await pineGameInfoClient.QueryTitleAsync(cancellationToken);
         var serialResult = await pineGameInfoClient.QuerySerialAsync(cancellationToken);
 
@@ -150,6 +171,7 @@ public sealed class Pcsx2Runtime(
         var title = titleResult.Value;
         var serial = serialResult.Value;
         var gameId = MapGameId(title, serial);
+
         var displayName = string.IsNullOrWhiteSpace(title)
             ? (serial ?? "Unknown loaded title")
             : title!;
@@ -161,22 +183,58 @@ public sealed class Pcsx2Runtime(
             IsSupported: gameId is not GameId.Unknown);
     }
 
+    private static GameDetectionResult CreateDreadZoneOnlineDetectionResult()
+        => new(
+            GameId.DL,
+            "DreadZone Online",
+            Version: new GameVersion("Unknown", "SCUS-97465"),
+            IsSupported: true);
+
+    private static bool IsDreadZoneOnlineFallback(Pcsx2ConnectionState state)
+        => string.Equals(state.PineEndpoint, "DreadZone Online", StringComparison.Ordinal);
+
+    private bool IsDreadZoneOnlineProcess(System.Diagnostics.Process process)
+        => processLocator.IsManagedByConfiguredLauncher(process);
+
     private static GameId MapGameId(string? title, string? serial)
     {
-        var normalizedSerial = serial?.Trim().ToUpperInvariant();
+        var normalizedTitle = title?.Trim();
+        var normalizedSerial = NormalizeSerial(serial);
 
-        if (normalizedSerial is "SCUS-97199")
+        if (normalizedSerial is "SCUS97199")
             return GameId.RAC1;
 
-        if (normalizedSerial is "SCUS-97268")
+        if (normalizedSerial is "SCUS97268")
             return GameId.GC;
 
-        if (normalizedSerial is "SCUS-97353")
+        if (normalizedSerial is "SCUS97353")
             return GameId.UYA;
 
-        if (normalizedSerial is "SCUS-97465")
+        if (normalizedSerial is "SCUS97465")
             return GameId.DL;
 
+        if (!string.IsNullOrWhiteSpace(normalizedTitle) &&
+            (normalizedTitle.Contains("DreadZone", StringComparison.OrdinalIgnoreCase) ||
+             normalizedTitle.Contains("Deadlocked", StringComparison.OrdinalIgnoreCase) ||
+             normalizedTitle.Contains("Gladiator", StringComparison.OrdinalIgnoreCase)))
+        {
+            return GameId.DL;
+        }
+
         return GameId.Unknown;
+    }
+
+    private static string? NormalizeSerial(string? serial)
+    {
+        if (string.IsNullOrWhiteSpace(serial))
+        {
+            return null;
+        }
+
+        return new string(serial
+            .Trim()
+            .ToUpperInvariant()
+            .Where(char.IsLetterOrDigit)
+            .ToArray());
     }
 }

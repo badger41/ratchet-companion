@@ -58,12 +58,23 @@ public sealed class LinuxPcsx2ProcessMemoryReader(Pcsx2ProcessLocator processLoc
     private static string? TryGetSharedMemoryFileDescriptorPath(int processId)
     {
         var fdDirectory = $"/proc/{processId}/fd";
-        if (!Directory.Exists(fdDirectory))
+        string[] fdPaths;
+
+        try
+        {
+            if (!Directory.Exists(fdDirectory))
+            {
+                return null;
+            }
+
+            fdPaths = Directory.GetFiles(fdDirectory);
+        }
+        catch
         {
             return null;
         }
 
-        foreach (var fdPath in Directory.EnumerateFiles(fdDirectory))
+        foreach (var fdPath in fdPaths)
         {
             try
             {

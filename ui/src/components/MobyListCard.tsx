@@ -16,6 +16,7 @@ type MobyListCardProps = {
   title: string;
   mobys: MobySummary[];
   gameId: number;
+  showAllocationTabs?: boolean;
   selectedMoby: MobySummary | null;
   onSelectedMobyChange: (moby: MobySummary | null) => void;
 };
@@ -24,6 +25,7 @@ export function MobyListCard({
   title,
   mobys,
   gameId,
+  showAllocationTabs = true,
   selectedMoby,
   onSelectedMobyChange,
 }: MobyListCardProps) {
@@ -37,7 +39,11 @@ export function MobyListCard({
     () => mobys.filter((moby) => !moby.isDynamic),
     [mobys],
   );
-  const visibleMobys = activeTab === 'dynamic' ? dynamicMobys : staticMobys;
+  const visibleMobys = showAllocationTabs
+    ? activeTab === 'dynamic'
+      ? dynamicMobys
+      : staticMobys
+    : mobys;
 
   const columnDefinitions: TableProps.ColumnDefinition<MobySummary>[] = [
     {
@@ -96,14 +102,16 @@ export function MobyListCard({
           </Header>
         }
         filter={
-          <Tabs
-            ariaLabel={`${title} tabs`}
-            tabs={tabs}
-            activeTabId={activeTab}
-            onChange={({ detail }) =>
-              setActiveTab(detail.activeTabId as 'dynamic' | 'static')
-            }
-          />
+          showAllocationTabs ? (
+            <Tabs
+              ariaLabel={`${title} tabs`}
+              tabs={tabs}
+              activeTabId={activeTab}
+              onChange={({ detail }) =>
+                setActiveTab(detail.activeTabId as 'dynamic' | 'static')
+              }
+            />
+          ) : null
         }
         items={visibleMobys}
         selectedItems={selectedMoby ? [selectedMoby] : []}
@@ -119,7 +127,7 @@ export function MobyListCard({
         sortingColumn={columnDefinitions[0]}
         empty={
           <Box textAlign="center" color="inherit">
-            No {activeTab} mobys available.
+            No {showAllocationTabs ? `${activeTab} ` : ''}mobys available.
           </Box>
         }
         ariaLabels={{

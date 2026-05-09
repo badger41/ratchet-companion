@@ -58,6 +58,14 @@ export function AppTopNavigation({
           label: 'Connection',
           value: isConnectedToPine ? 'Connected to PINE' : 'No PINE connection',
         },
+        {
+          label: 'Endpoint',
+          value: status?.connection.pineEndpoint ?? 'Unknown',
+        },
+        {
+          label: 'Failure',
+          value: status?.connection.pineFailureReason ?? 'None',
+        },
         { label: 'Backend', value: status?.backend ?? 'Unknown' },
         {
           label: 'Session',

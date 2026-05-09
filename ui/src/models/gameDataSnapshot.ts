@@ -4,6 +4,7 @@ import type { MobySummary, PlayerPosition } from './gameData';
 // here with its camelCase Payload type so consumers can narrow by snapshot.schema.
 export type GameDataPayloadBySchema = {
   'uya.map-id.v1': UyaMapIdPayload;
+  'dl.mp.mobys.v1': DlMpMobysPayload;
 };
 
 export type GameDataSnapshot = {
@@ -24,6 +25,18 @@ export type UyaMapIdPayload = {
 };
 
 export type UyaMobyListData = {
+  mobys: MobySummary[];
+  staticCount: number;
+  dynamicCount: number;
+  dynamicCapacity: number;
+};
+
+export type DlMpMobysPayload = {
+  isAvailable: boolean;
+  mobyList: DlMobyListData | null;
+};
+
+export type DlMobyListData = {
   mobys: MobySummary[];
   staticCount: number;
   dynamicCount: number;

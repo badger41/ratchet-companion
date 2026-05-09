@@ -6,11 +6,30 @@ public sealed class PineProbeClient(Pcsx2Options options)
 {
     public async Task<PineProbeResult> ProbeAsync(CancellationToken cancellationToken = default)
     {
-        if (!string.IsNullOrWhiteSpace(options.PineSocketPath) && OperatingSystem.IsLinux())
+        PineProbeResult? lastFailure = null;
+
+        foreach (var endpoint in PineEndpointResolver.GetCandidates(options))
         {
-            return await ProbeUnixSocketAsync(options.PineSocketPath, cancellationToken);
+            var result = endpoint.Kind switch
+            {
+                PineEndpointKind.UnixSocket => await ProbeUnixSocketAsync(endpoint, cancellationToken),
+                PineEndpointKind.Tcp => await ProbeTcpAsync(endpoint, cancellationToken),
+                _ => throw new InvalidOperationException($"Unknown PINE endpoint kind '{endpoint.Kind}'."),
+            };
+
+            if (result.IsReachable)
+            {
+                return result;
+            }
+
+            lastFailure = result;
         }
 
+        return lastFailure ?? new PineProbeResult(false, "PINE", "No PINE endpoints were configured.");
+    }
+
+    private async Task<PineProbeResult> ProbeTcpAsync(PineEndpoint endpoint, CancellationToken cancellationToken)
+    {
         using var tcpClient = new TcpClient();
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeoutCts.CancelAfter(options.PineTimeoutMilliseconds);
@@ -21,19 +40,19 @@ public sealed class PineProbeClient(Pcsx2Options options)
 
             return new PineProbeResult(
                 IsReachable: true,
-                Endpoint: $"{options.PineHost}:{options.PinePort}",
+                Endpoint: endpoint.Label,
                 FailureReason: null);
         }
         catch (Exception exception) when (exception is SocketException or OperationCanceledException)
         {
             return new PineProbeResult(
                 IsReachable: false,
-                Endpoint: $"{options.PineHost}:{options.PinePort}",
+                Endpoint: endpoint.Label,
                 FailureReason: exception.Message);
         }
     }
 
-    private async Task<PineProbeResult> ProbeUnixSocketAsync(string socketPath, CancellationToken cancellationToken)
+    private async Task<PineProbeResult> ProbeUnixSocketAsync(PineEndpoint endpoint, CancellationToken cancellationToken)
     {
         using var socket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -41,18 +60,18 @@ public sealed class PineProbeClient(Pcsx2Options options)
 
         try
         {
-            await socket.ConnectAsync(new UnixDomainSocketEndPoint(socketPath), timeoutCts.Token);
+            await socket.ConnectAsync(new UnixDomainSocketEndPoint(endpoint.SocketPath!), timeoutCts.Token);
 
             return new PineProbeResult(
                 IsReachable: true,
-                Endpoint: socketPath,
+                Endpoint: endpoint.Label,
                 FailureReason: null);
         }
         catch (Exception exception) when (exception is SocketException or OperationCanceledException)
         {
             return new PineProbeResult(
                 IsReachable: false,
-                Endpoint: socketPath,
+                Endpoint: endpoint.Label,
                 FailureReason: exception.Message);
         }
     }
