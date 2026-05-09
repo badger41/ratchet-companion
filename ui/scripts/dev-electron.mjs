@@ -2,8 +2,9 @@ import { spawn } from 'node:child_process'
 
 const backendUrl = 'http://127.0.0.1:48123/api/health'
 const rendererUrl = 'http://127.0.0.1:5173/'
+const isWindows = process.platform === 'win32'
 const electronCommand =
-  process.platform === 'win32'
+  isWindows
     ? '.\\node_modules\\.bin\\electron.cmd'
     : './node_modules/.bin/electron'
 
@@ -37,7 +38,7 @@ try {
     ['.'],
     {
       stdio: 'inherit',
-      shell: false,
+      shell: isWindows,
       env: {
         ...process.env,
         ELECTRON_RUN_AS_NODE: undefined,

@@ -3,14 +3,14 @@ import { spawn } from 'node:child_process'
 const children = []
 let shuttingDown = false
 const isWindows = process.platform === 'win32'
-const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm'
+const npmCommand = 'npm'
 
 function start(name, command, args) {
   console.log(`[dev] starting ${name}: ${command} ${args.join(' ')}`)
 
   const child = spawn(command, args, {
     stdio: 'inherit',
-    shell: false,
+    shell: isWindows,
     env: process.env,
     detached: !isWindows,
   })
