@@ -2,14 +2,17 @@ import { spawn } from 'node:child_process'
 
 const children = []
 let shuttingDown = false
+const isWindows = process.platform === 'win32'
 const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm'
 
 function start(name, command, args) {
+  console.log(`[dev] starting ${name}: ${command} ${args.join(' ')}`)
+
   const child = spawn(command, args, {
     stdio: 'inherit',
     shell: false,
     env: process.env,
-    detached: true,
+    detached: !isWindows,
   })
 
   children.push({ name, child })
@@ -46,34 +49,43 @@ function shutdown(signal, exitCode = 0) {
   console.log(`[dev] shutting down children with ${signal}`)
 
   for (const { name, child } of children) {
-    if (!child.pid) {
-      continue
-    }
-
-    try {
-      process.kill(-child.pid, signal)
-      console.log(`[dev] sent ${signal} to ${name} process group ${child.pid}`)
-    } catch (error) {
-      console.log(`[dev] unable to signal ${name} process group ${child.pid}: ${error.message}`)
-    }
+    stopChild(name, child, signal)
   }
 
   setTimeout(() => {
     for (const { name, child } of children) {
-      if (!child.pid) {
-        continue
-      }
-
-      try {
-        process.kill(-child.pid, 'SIGKILL')
-        console.log(`[dev] sent SIGKILL to ${name} process group ${child.pid}`)
-      } catch {
-        // Already exited.
-      }
+      stopChild(name, child, 'SIGKILL')
     }
 
     process.exit(exitCode)
   }, 1500)
+}
+
+function stopChild(name, child, signal) {
+  if (!child.pid || child.exitCode !== null || child.signalCode !== null) {
+    return
+  }
+
+  if (isWindows) {
+    const taskkill = spawn('taskkill', ['/pid', String(child.pid), '/t', '/f'], {
+      stdio: 'ignore',
+      shell: false,
+    })
+
+    taskkill.on('error', (error) => {
+      console.log(`[dev] unable to stop ${name} pid ${child.pid}: ${error.message}`)
+    })
+    return
+  }
+
+  try {
+    process.kill(-child.pid, signal)
+    console.log(`[dev] sent ${signal} to ${name} process group ${child.pid}`)
+  } catch (error) {
+    if (error?.code !== 'ESRCH') {
+      console.log(`[dev] unable to signal ${name} process group ${child.pid}: ${error.message}`)
+    }
+  }
 }
 
 process.on('SIGINT', () => shutdown('SIGINT'))
