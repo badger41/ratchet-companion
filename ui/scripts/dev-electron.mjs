@@ -2,6 +2,10 @@ import { spawn } from 'node:child_process'
 
 const backendUrl = 'http://127.0.0.1:48123/api/health'
 const rendererUrl = 'http://127.0.0.1:5173/'
+const electronCommand =
+  process.platform === 'win32'
+    ? '.\\node_modules\\.bin\\electron.cmd'
+    : './node_modules/.bin/electron'
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -29,7 +33,7 @@ try {
   await waitFor(backendUrl, 'backend')
 
   const child = spawn(
-    './node_modules/.bin/electron',
+    electronCommand,
     ['.'],
     {
       stdio: 'inherit',

@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process'
 
 const children = []
 let shuttingDown = false
+const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm'
 
 function start(name, command, args) {
   const child = spawn(command, args, {
@@ -78,6 +79,6 @@ function shutdown(signal, exitCode = 0) {
 process.on('SIGINT', () => shutdown('SIGINT'))
 process.on('SIGTERM', () => shutdown('SIGTERM'))
 
-start('renderer', 'npm', ['run', 'dev:renderer'])
-start('backend', 'npm', ['run', 'dev:backend'])
-start('electron', 'npm', ['run', 'dev:electron'])
+start('renderer', npmCommand, ['run', 'dev:renderer'])
+start('backend', npmCommand, ['run', 'dev:backend'])
+start('electron', npmCommand, ['run', 'dev:electron'])
