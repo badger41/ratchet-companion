@@ -179,8 +179,6 @@ public sealed class UyaMpMobyMemory
             return null;
         }
 
-        _watchedMemoryTracker.WatchMemory($"uya.mp.moby-pvar.{oClass:X4}.{pvarPointer:X8}", pvarPointer, metadata.ByteCount);
-
         return new UyaMpMobyPvarSummary(
             Pointer: pvarPointer,
             ByteCount: metadata.ByteCount,

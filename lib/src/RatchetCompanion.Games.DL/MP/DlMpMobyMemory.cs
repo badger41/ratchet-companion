@@ -136,8 +136,6 @@ public sealed class DlMpMobyMemory
             return null;
         }
 
-        _watchedMemoryTracker.WatchMemory($"dl.mp.moby-pvar.{oClass:X4}.{pvarPointer:X8}", pvarPointer, metadata.ByteCount);
-
         return new DlMpMobyPvarSummary(
             Pointer: pvarPointer,
             ByteCount: metadata.ByteCount,

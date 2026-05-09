@@ -2,9 +2,15 @@ using System.Runtime.InteropServices;
 
 namespace RatchetCompanion.PCSX2.Process;
 
-public sealed class WindowsPcsx2ProcessMemoryReader(Pcsx2ProcessLocator processLocator)
+public sealed class WindowsPcsx2ProcessMemoryReader(Pcsx2ProcessLocator processLocator) : IDisposable
 {
     private const uint FileMapRead = 0x0004;
+
+    private readonly object _gate = new();
+    private int? _mappedProcessId;
+    private IntPtr _mappingHandle;
+    private IntPtr _view;
+    private bool _disposed;
 
     public Task<byte[]?> ReadEeMemoryAsync(uint eeAddress, int byteCount, CancellationToken cancellationToken = default)
     {
@@ -18,9 +24,18 @@ public sealed class WindowsPcsx2ProcessMemoryReader(Pcsx2ProcessLocator processL
             return Task.FromResult<byte[]?>([]);
         }
 
+        if (_mappedProcessId.HasValue)
+        {
+            var cachedBuffer = TryReadFromCachedMapping(_mappedProcessId.Value, eeAddress, byteCount);
+            if (cachedBuffer is not null)
+            {
+                return Task.FromResult<byte[]?>(cachedBuffer);
+            }
+        }
+
         foreach (var process in processLocator.FindRunningProcesses())
         {
-            var buffer = TryReadFromMapping(process.Id, eeAddress, byteCount);
+            var buffer = TryReadFromCachedMapping(process.Id, eeAddress, byteCount);
             if (buffer is not null)
             {
                 return Task.FromResult<byte[]?>(buffer);
@@ -30,19 +45,30 @@ public sealed class WindowsPcsx2ProcessMemoryReader(Pcsx2ProcessLocator processL
         return Task.FromResult<byte[]?>(null);
     }
 
-    private static byte[]? TryReadFromMapping(int processId, uint eeAddress, int byteCount)
+    public void Dispose()
     {
-        var mappingName = $"pcsx2_{processId}";
-        var mappingHandle = OpenFileMapping(FileMapRead, false, mappingName);
-        if (mappingHandle == IntPtr.Zero)
+        lock (_gate)
         {
-            return null;
-        }
+            if (_disposed)
+            {
+                return;
+            }
 
-        try
+            CloseCachedMapping();
+            _disposed = true;
+        }
+    }
+
+    private byte[]? TryReadFromCachedMapping(int processId, uint eeAddress, int byteCount)
+    {
+        lock (_gate)
         {
-            var view = MapViewOfFile(mappingHandle, FileMapRead, 0, 0, UIntPtr.Zero);
-            if (view == IntPtr.Zero)
+            if (_disposed)
+            {
+                return null;
+            }
+
+            if (!EnsureCachedMapping(processId))
             {
                 return null;
             }
@@ -50,18 +76,60 @@ public sealed class WindowsPcsx2ProcessMemoryReader(Pcsx2ProcessLocator processL
             try
             {
                 var buffer = new byte[byteCount];
-                Marshal.Copy(IntPtr.Add(view, checked((int)eeAddress)), buffer, 0, byteCount);
+                Marshal.Copy(IntPtr.Add(_view, checked((int)eeAddress)), buffer, 0, byteCount);
                 return buffer;
             }
-            finally
+            catch
             {
-                UnmapViewOfFile(view);
+                CloseCachedMapping();
+                return null;
             }
         }
-        finally
+    }
+
+    private bool EnsureCachedMapping(int processId)
+    {
+        if (_mappedProcessId == processId && _mappingHandle != IntPtr.Zero && _view != IntPtr.Zero)
+        {
+            return true;
+        }
+
+        CloseCachedMapping();
+
+        var mappingHandle = OpenFileMapping(FileMapRead, false, $"pcsx2_{processId}");
+        if (mappingHandle == IntPtr.Zero)
+        {
+            return false;
+        }
+
+        var view = MapViewOfFile(mappingHandle, FileMapRead, 0, 0, UIntPtr.Zero);
+        if (view == IntPtr.Zero)
         {
             CloseHandle(mappingHandle);
+            return false;
         }
+
+        _mappedProcessId = processId;
+        _mappingHandle = mappingHandle;
+        _view = view;
+        return true;
+    }
+
+    private void CloseCachedMapping()
+    {
+        if (_view != IntPtr.Zero)
+        {
+            UnmapViewOfFile(_view);
+            _view = IntPtr.Zero;
+        }
+
+        if (_mappingHandle != IntPtr.Zero)
+        {
+            CloseHandle(_mappingHandle);
+            _mappingHandle = IntPtr.Zero;
+        }
+
+        _mappedProcessId = null;
     }
 
     [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
