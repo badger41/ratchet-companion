@@ -5,6 +5,7 @@ public sealed class RatchetCompanionOptions
     public BackendOptions Backend { get; init; } = new();
     public PineOptions Pine { get; init; } = new();
     public PollingOptions Polling { get; init; } = new();
+    public AppearanceOptions Appearance { get; init; } = new();
 
     public static RatchetCompanionOptions CreateDefault()
         => new();
@@ -29,4 +30,9 @@ public sealed class PollingOptions
     public int MemoryMilliseconds { get; init; } = 250;
     public int WebsocketStatusMilliseconds { get; init; } = 250;
     public int WebsocketMemoryMilliseconds { get; init; } = 250;
+}
+
+public sealed class AppearanceOptions
+{
+    public bool PreserveHexViewColors { get; init; }
 }

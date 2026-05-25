@@ -4,7 +4,10 @@ import { BackendStatusCard } from './components/BackendStatusCard';
 import { SettingsModal } from './components/SettingsModal';
 import { AppTopNavigation } from './components/TopNavigation';
 import { useBackendStatus } from './hooks/useBackendStatus';
+import { getAppConfig } from './services/appConfig';
 import { loadPvarOverlay } from './services/pvarOverlay';
+
+const preserveHexViewColorsClassName = 'preserve-hex-view-colors';
 
 function App() {
   const { status, error, isPending, toggleConnection } = useBackendStatus();
@@ -32,6 +35,29 @@ function App() {
     return () => {
       isCurrent = false;
       window.clearInterval(intervalId);
+    };
+  }, []);
+
+  useEffect(() => {
+    let isCurrent = true;
+
+    getAppConfig()
+      .then((snapshot) => {
+        if (!isCurrent) {
+          return;
+        }
+
+        document.documentElement.classList.toggle(
+          preserveHexViewColorsClassName,
+          snapshot.effective.appearance.preserveHexViewColors,
+        );
+      })
+      .catch((error: unknown) => {
+        console.error(error);
+      });
+
+    return () => {
+      isCurrent = false;
     };
   }, []);
 

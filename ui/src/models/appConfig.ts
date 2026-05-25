@@ -2,6 +2,7 @@ export type RatchetCompanionOptions = {
   backend: BackendOptions;
   pine: PineOptions;
   polling: PollingOptions;
+  appearance: AppearanceOptions;
 };
 
 export type BackendOptions = {
@@ -20,6 +21,10 @@ export type PollingOptions = {
   memoryMilliseconds: number;
   websocketStatusMilliseconds: number;
   websocketMemoryMilliseconds: number;
+};
+
+export type AppearanceOptions = {
+  preserveHexViewColors: boolean;
 };
 
 export type ConfigSnapshot = {

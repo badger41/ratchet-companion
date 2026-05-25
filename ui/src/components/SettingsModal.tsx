@@ -2,6 +2,7 @@ import {
   Alert,
   Box,
   Button,
+  Checkbox,
   ColumnLayout,
   FormField,
   Header,
@@ -32,6 +33,8 @@ const pollingBounds = {
   min: 1,
   max: 1000,
 };
+
+const preserveHexViewColorsClassName = 'preserve-hex-view-colors';
 
 export function SettingsModal({ visible, onDismiss }: SettingsModalProps) {
   const [snapshot, setSnapshot] = useState<ConfigSnapshot | null>(null);
@@ -101,6 +104,7 @@ export function SettingsModal({ visible, onDismiss }: SettingsModalProps) {
       const nextSnapshot = await saveAppConfig(draft);
       setSnapshot(nextSnapshot);
       setDraft(nextSnapshot.effective);
+      applyAppearanceSettings(nextSnapshot.effective);
       setSaveState('saved');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to save settings');
@@ -116,6 +120,7 @@ export function SettingsModal({ visible, onDismiss }: SettingsModalProps) {
       const nextSnapshot = await resetAppConfig();
       setSnapshot(nextSnapshot);
       setDraft(nextSnapshot.effective);
+      applyAppearanceSettings(nextSnapshot.effective);
       setSaveState('reset');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to reset settings');
@@ -166,20 +171,20 @@ export function SettingsModal({ visible, onDismiss }: SettingsModalProps) {
         ) : null}
         {saveState === 'saved' ? (
           <Alert type="success">
-            Settings saved. Restart the app to apply changes.
+            Settings saved. Some changes may require an app restart.
           </Alert>
         ) : null}
         {saveState === 'reset' ? (
           <Alert type="success">
-            Defaults restored. Restart the app to apply changes.
+            Defaults restored. Some changes may require an app restart.
           </Alert>
         ) : null}
         {snapshot?.warnings.length ? (
           <Alert type="warning">{snapshot.warnings.join(' ')}</Alert>
         ) : null}
         <Alert type="info">
-          Changes are saved immediately, but the app uses the new values after
-          restart.
+          Changes are saved immediately. Connection and polling changes apply
+          after restart.
         </Alert>
 
         {draft ? (
@@ -257,6 +262,23 @@ export function SettingsModal({ visible, onDismiss }: SettingsModalProps) {
                   }
                 />
               </ColumnLayout>
+            </SettingsSection>
+
+            <SettingsSection title="Appearance">
+              <Checkbox
+                checked={draft.appearance.preserveHexViewColors}
+                onChange={({ detail }) =>
+                  updateDraft({
+                    ...draft,
+                    appearance: {
+                      ...draft.appearance,
+                      preserveHexViewColors: detail.checked,
+                    },
+                  })
+                }
+              >
+                Preserve hex view colors
+              </Checkbox>
             </SettingsSection>
 
             <SettingsSection title="Polling">
@@ -443,5 +465,12 @@ function isValidPolling(value: number) {
     Number.isInteger(value) &&
     value >= pollingBounds.min &&
     value <= pollingBounds.max
+  );
+}
+
+function applyAppearanceSettings(config: RatchetCompanionOptions) {
+  document.documentElement.classList.toggle(
+    preserveHexViewColorsClassName,
+    config.appearance.preserveHexViewColors,
   );
 }

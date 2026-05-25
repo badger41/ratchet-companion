@@ -60,3 +60,8 @@ select {
   background: rgba(var(--hex-highlight-rgb), 0.28);
   pointer-events: none;
 }
+
+.preserve-hex-view-colors .hex-byte-view,
+.preserve-hex-view-colors .hex-byte-view * {
+  forced-color-adjust: none;
+}

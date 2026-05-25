@@ -47,6 +47,7 @@ export function HexByteView({
 
   return (
     <div
+      className="hex-byte-view"
       style={{
         maxHeight: '45vh',
         overflow: 'auto',

@@ -114,6 +114,7 @@ public sealed class RatchetCompanionConfigStore
         var backend = options.Backend ?? defaults.Backend;
         var pine = options.Pine ?? defaults.Pine;
         var polling = options.Polling ?? defaults.Polling;
+        var appearance = options.Appearance ?? defaults.Appearance;
         var backendHost = NormalizeHost(backend.Host, defaults.Backend.Host, "Backend.Host", warnings);
         var backendPort = NormalizePort(backend.Port, defaults.Backend.Port, "Backend.Port", warnings);
         var pineHost = NormalizeHost(pine.Host, defaults.Pine.Host, "Pine.Host", warnings);
@@ -160,6 +161,10 @@ public sealed class RatchetCompanionConfigStore
                 MemoryMilliseconds = memoryPolling,
                 WebsocketStatusMilliseconds = websocketStatusPolling,
                 WebsocketMemoryMilliseconds = websocketMemoryPolling,
+            },
+            Appearance = new AppearanceOptions
+            {
+                PreserveHexViewColors = appearance.PreserveHexViewColors,
             },
         };
     }
