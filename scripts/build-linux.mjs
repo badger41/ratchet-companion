@@ -15,6 +15,28 @@ const releaseDirectory = isFrameworkDependentBuild
   ? path.join(buildRoot, 'release-linux-framework')
   : path.join(buildRoot, 'release-linux')
 const isWindows = process.platform === 'win32'
+const buildVersion = process.env.BUILD_VERSION
+
+function getAssemblyVersion(version) {
+  const match = version.match(/^(\d+)(?:\.(\d+))?(?:\.(\d+))?(?:\.(\d+))?/)
+
+  if (!match) {
+    return undefined
+  }
+
+  const [, major, minor = '0', patch = '0', revision = '0'] = match
+  return `${major}.${minor}.${patch}.${revision}`
+}
+
+const assemblyVersion = buildVersion ? getAssemblyVersion(buildVersion) : undefined
+const versionProperties = buildVersion
+  ? [
+      `-p:Version=${buildVersion}`,
+      ...(assemblyVersion
+        ? [`-p:AssemblyVersion=${assemblyVersion}`, `-p:FileVersion=${assemblyVersion}`]
+        : []),
+    ]
+  : []
 
 function run(command, args, options = {}) {
   return new Promise((resolve, reject) => {
@@ -52,6 +74,7 @@ await run('dotnet', [
   '-p:PublishSingleFile=true',
   '-p:DebugSymbols=false',
   '-p:DebugType=None',
+  ...versionProperties,
   '-o',
   backendOutput,
 ])
