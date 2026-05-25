@@ -9,7 +9,9 @@ import {
   KeyValuePairs,
   SegmentedControl,
   SpaceBetween,
+  Table,
   Tabs,
+  TextFilter,
   type TabsProps,
 } from '@cloudscape-design/components';
 import { useMemo, useState } from 'react';
@@ -26,6 +28,7 @@ import { HexByteView, type HexByteHighlightRange } from './HexByteView';
 const UYA_PVAR_OVERLAY_VERSION = 3;
 const DL_PVAR_OVERLAY_VERSION = 4;
 type PvarViewMode = 'overlay' | 'raw';
+type NetObjectViewMode = 'fields' | 'raw';
 
 type MobyInfoCardProps = {
   moby: MobySummary | null;
@@ -34,6 +37,8 @@ type MobyInfoCardProps = {
 
 export function MobyInfoCard({ moby, gameId }: MobyInfoCardProps) {
   const [pvarViewMode, setPvarViewMode] = useState<PvarViewMode>('overlay');
+  const [netObjectViewMode, setNetObjectViewMode] =
+    useState<NetObjectViewMode>('fields');
   const { bytes, error } = useMemoryBlock(
     moby?.pointer ?? null,
     mobyMemoryByteCount,
@@ -41,6 +46,10 @@ export function MobyInfoCard({ moby, gameId }: MobyInfoCardProps) {
   const { bytes: pvarBytes, error: pvarError } = useMemoryBlock(
     moby?.pvar?.pointer ?? null,
     moby?.pvar?.byteCount ?? 0,
+  );
+  const { bytes: netObjectBytes, error: netObjectError } = useMemoryBlock(
+    moby?.netObject?.pointer ?? null,
+    moby?.netObject?.byteCount ?? 0,
   );
   const overlayVersion =
     gameId === 4 ? DL_PVAR_OVERLAY_VERSION : UYA_PVAR_OVERLAY_VERSION;
@@ -55,6 +64,10 @@ export function MobyInfoCard({ moby, gameId }: MobyInfoCardProps) {
   const pvarHighlights = useMemo(
     () => createPvarHighlights(pvarFields),
     [pvarFields],
+  );
+  const netObjectHighlights = useMemo(
+    () => createNetObjectHighlights(moby?.netObject?.fields ?? []),
+    [moby?.netObject?.fields],
   );
 
   if (!moby) {
@@ -114,6 +127,12 @@ export function MobyInfoCard({ moby, gameId }: MobyInfoCardProps) {
                       label: 'pVar',
                       value: memory ? formatPointer(memory.pVar) : '—',
                     },
+                    {
+                      label: 'netObject',
+                      value: memory?.netObject
+                        ? formatPointer(memory.netObject)
+                        : '—',
+                    },
                   ]}
                 />
               </SpaceBetween>
@@ -128,9 +147,162 @@ export function MobyInfoCard({ moby, gameId }: MobyInfoCardProps) {
             pvarViewMode,
             setPvarViewMode,
           ),
+          createNetObjectTab(
+            moby,
+            netObjectHighlights,
+            netObjectBytes,
+            netObjectError,
+            netObjectViewMode,
+            setNetObjectViewMode,
+          ),
         ]}
       />
     </Container>
+  );
+}
+
+function createNetObjectTab(
+  moby: MobySummary,
+  highlights: HexByteHighlightRange[],
+  bytes: Uint8Array | null,
+  error: string | null,
+  viewMode: NetObjectViewMode,
+  onViewModeChange: (viewMode: NetObjectViewMode) => void,
+): TabsProps.Tab {
+  return {
+    id: 'net-object',
+    label: 'net object',
+    content: (
+      <SpaceBetween size="m">
+        {moby.netObject ? (
+          <KeyValuePairs
+            columns={3}
+            items={[
+              { label: 'Type', value: moby.netObject.dataType },
+              {
+                label: 'Pointer',
+                value: formatPointer(moby.netObject.pointer),
+              },
+              {
+                label: 'Size',
+                value: `${moby.netObject.byteCount} bytes`,
+              },
+            ]}
+          />
+        ) : null}
+        {error ? <Alert type="error">{error}</Alert> : null}
+        {!moby.netObject ? (
+          <Alert type="info">
+            No net object data type is mapped for this Moby.
+          </Alert>
+        ) : (
+          <SpaceBetween size="m">
+            <SegmentedControl
+              label="net object view mode"
+              selectedId={viewMode}
+              onChange={({ detail }) =>
+                onViewModeChange(detail.selectedId as NetObjectViewMode)
+              }
+              options={[
+                { id: 'fields', text: 'Fields' },
+                { id: 'raw', text: 'Raw' },
+              ]}
+            />
+            {viewMode === 'fields' ? (
+              <NetObjectFields fields={moby.netObject.fields} bytes={bytes} />
+            ) : (
+              <HexByteView
+                bytes={bytes}
+                highlights={highlights}
+                bytesPerRow={16}
+              />
+            )}
+          </SpaceBetween>
+        )}
+      </SpaceBetween>
+    ),
+  };
+}
+
+function NetObjectFields({
+  fields,
+  bytes,
+}: {
+  fields: NonNullable<MobySummary['netObject']>['fields'];
+  bytes: Uint8Array | null;
+}) {
+  const [filteringText, setFilteringText] = useState('');
+  const visibleFields = useMemo(() => {
+    const query = filteringText.trim().toLowerCase();
+
+    if (!query) {
+      return fields;
+    }
+
+    return fields.filter((field) =>
+      [field.category, field.name, field.dataType]
+        .join(' ')
+        .toLowerCase()
+        .includes(query),
+    );
+  }, [fields, filteringText]);
+
+  return (
+    <Table
+      variant="embedded"
+      stickyHeader
+      contentDensity="compact"
+      items={visibleFields}
+      trackBy={(field) => `${field.offset}-${field.name}`}
+      filter={
+        <TextFilter
+          filteringText={filteringText}
+          filteringPlaceholder="Find fields"
+          filteringAriaLabel="Find net object fields"
+          onChange={({ detail }) => setFilteringText(detail.filteringText)}
+        />
+      }
+      columnDefinitions={[
+        {
+          id: 'category',
+          header: 'Category',
+          cell: (field) => field.category,
+          sortingField: 'category',
+        },
+        {
+          id: 'name',
+          header: 'Field',
+          cell: (field) => field.name,
+          sortingField: 'name',
+          isRowHeader: true,
+        },
+        {
+          id: 'offset',
+          header: 'Offset',
+          cell: (field) => formatOffset(field.offset),
+          sortingComparator: (left, right) => left.offset - right.offset,
+        },
+        {
+          id: 'type',
+          header: 'Type',
+          cell: (field) => field.dataType,
+          sortingField: 'dataType',
+        },
+        {
+          id: 'size',
+          header: 'Size',
+          cell: (field) => `${field.byteCount} bytes`,
+          sortingComparator: (left, right) => left.byteCount - right.byteCount,
+        },
+        {
+          id: 'value',
+          header: 'Value',
+          cell: (field) => formatNetObjectFieldValue(bytes, field),
+        },
+      ]}
+      sortingColumn={{ sortingField: 'category' }}
+      empty={<Alert type="info">No fields match the current filter.</Alert>}
+    />
   );
 }
 
@@ -278,6 +450,87 @@ function createPvarHighlights(
       byteCount: getPvarFieldByteCount(field),
       label: field.Name,
     }));
+}
+
+function createNetObjectHighlights(
+  fields: NonNullable<MobySummary['netObject']>['fields'],
+): HexByteHighlightRange[] {
+  return fields.map((field) => ({
+    offset: field.offset,
+    byteCount: field.byteCount,
+    label: field.name,
+  }));
+}
+
+function formatNetObjectFieldValue(
+  bytes: Uint8Array | null,
+  field: NonNullable<MobySummary['netObject']>['fields'][number],
+) {
+  if (
+    !bytes ||
+    field.offset < 0 ||
+    field.offset + field.byteCount > bytes.byteLength
+  ) {
+    return '—';
+  }
+
+  if (!isScalarDataType(field.dataType) || field.byteCount > 4) {
+    return formatHexBytes(
+      bytes.slice(field.offset, field.offset + Math.min(field.byteCount, 16)),
+    );
+  }
+
+  const view = new DataView(
+    bytes.buffer,
+    bytes.byteOffset + field.offset,
+    field.byteCount,
+  );
+
+  switch (field.dataType) {
+    case 'float':
+      return view.getFloat32(0, true).toFixed(3);
+    case 'bool':
+      return bytes[field.offset] ? 'true' : 'false';
+    case 'char':
+    case 'signed char':
+      return String(view.getInt8(0));
+    case 'unsigned char':
+      return String(view.getUint8(0));
+    case 'short':
+    case 'short int':
+      return String(view.getInt16(0, true));
+    case 'unsigned short':
+    case 'short unsigned int':
+      return String(view.getUint16(0, true));
+    case 'int':
+      return String(view.getInt32(0, true));
+    case 'unsigned int':
+    default:
+      return `0x${view.getUint32(0, true).toString(16).toUpperCase().padStart(8, '0')}`;
+  }
+}
+
+function isScalarDataType(dataType: string) {
+  return [
+    'float',
+    'bool',
+    'char',
+    'signed char',
+    'unsigned char',
+    'short',
+    'short int',
+    'unsigned short',
+    'short unsigned int',
+    'int',
+    'unsigned int',
+  ].includes(dataType);
+}
+
+function formatHexBytes(bytes: Uint8Array) {
+  const suffix = bytes.byteLength >= 16 ? '…' : '';
+  return `0x${Array.from(bytes)
+    .map((byte) => byte.toString(16).toUpperCase().padStart(2, '0'))
+    .join('')}${suffix}`;
 }
 
 function getPvarFieldByteCount(

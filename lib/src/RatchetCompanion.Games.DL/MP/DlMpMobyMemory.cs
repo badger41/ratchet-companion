@@ -4,7 +4,14 @@ namespace RatchetCompanion.Games.DL.MP;
 
 public sealed record DlMpMobyPvarSummary(uint Pointer, int ByteCount, string Name);
 
-public sealed record DlMpMobySummary(uint Pointer, ushort OClass, bool IsDynamic, DlMpMobyPvarSummary? Pvar);
+public sealed record DlMpMobySummary(
+    uint Pointer,
+    ushort OClass,
+    string? Name,
+    bool IsDynamic,
+    uint NetObjectPointer,
+    DlMpMobyPvarSummary? Pvar,
+    DlMpNetObjectSummary? NetObject);
 
 public sealed record DlMpMobyListData(
     IReadOnlyList<DlMpMobySummary> Mobys,
@@ -19,6 +26,7 @@ public sealed class DlMpMobyMemory
     private const uint NumSpawnableMobysAddress = 0x00222790;
     private const uint BeginMobyPointerAddress = 0x00222794;
     private const uint EndMobyPointerAddress = 0x002227B0;
+    private const int NetObjectOffset = 0x90;
     private const int PVarOffset = 0xAC;
     private const int OClassOffset = 0xBC;
     private const int MaxMobyCapacity = 4096;
@@ -26,15 +34,18 @@ public sealed class DlMpMobyMemory
     private readonly IPcsx2Runtime _pcsx2Runtime;
     private readonly IWatchedMemoryTracker _watchedMemoryTracker;
     private readonly DlMpPvarOverlay _pvarOverlay;
+    private readonly DlMpNetObjectCatalog _netObjectCatalog;
 
     public DlMpMobyMemory(
         IPcsx2Runtime pcsx2Runtime,
         IWatchedMemoryTracker watchedMemoryTracker,
-        DlMpPvarOverlay pvarOverlay)
+        DlMpPvarOverlay pvarOverlay,
+        DlMpNetObjectCatalog netObjectCatalog)
     {
         _pcsx2Runtime = pcsx2Runtime;
         _watchedMemoryTracker = watchedMemoryTracker;
         _pvarOverlay = pvarOverlay;
+        _netObjectCatalog = netObjectCatalog;
 
         _watchedMemoryTracker.WatchMemory("dl.mp.moby-count", NumSpawnableMobysAddress, sizeof(int));
         _watchedMemoryTracker.WatchMemory("dl.mp.moby-pointers.start", BeginMobyPointerAddress, PointerSize);
@@ -93,11 +104,16 @@ public sealed class DlMpMobyMemory
                 continue;
             }
 
+            var netObjectPointer = BitConverter.ToUInt32(mobyBytes, offset + NetObjectOffset);
+            var metadata = _pvarOverlay.Find(oClass);
             mobys.Add(new DlMpMobySummary(
                 Pointer: start + (uint)offset,
                 OClass: oClass,
+                Name: metadata?.Name,
                 IsDynamic: false,
-                Pvar: CreatePvarSummary(mobyBytes, offset, oClass)));
+                NetObjectPointer: netObjectPointer,
+                Pvar: CreatePvarSummary(mobyBytes, offset, metadata),
+                NetObject: _netObjectCatalog.CreateSummary(netObjectPointer, metadata?.NetObjectDataType)));
         }
 
         return new DlMpMobyListData(mobys, mobys.Count, 0, listCapacity);
@@ -122,9 +138,8 @@ public sealed class DlMpMobyMemory
         return true;
     }
 
-    private DlMpMobyPvarSummary? CreatePvarSummary(byte[] mobyBytes, int mobyOffset, ushort oClass)
+    private static DlMpMobyPvarSummary? CreatePvarSummary(byte[] mobyBytes, int mobyOffset, DlMpPvarMetadata? metadata)
     {
-        var metadata = _pvarOverlay.Find(oClass);
         if (metadata is null)
         {
             return null;

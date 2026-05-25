@@ -3,7 +3,7 @@ using System.Text.Json;
 
 namespace RatchetCompanion.Games.DL.MP;
 
-public sealed record DlMpPvarMetadata(string Name, int ByteCount);
+public sealed record DlMpPvarMetadata(string Name, int ByteCount, string? NetObjectDataType);
 
 public sealed class DlMpPvarOverlay
 {
@@ -64,16 +64,32 @@ public sealed class DlMpPvarOverlay
             .Where(entry =>
                 entry.RCVersion == DlRcVersion &&
                 !string.IsNullOrWhiteSpace(entry.Name) &&
-                entry.MobyOClass is >= ushort.MinValue and <= ushort.MaxValue &&
                 entry.Length is > 0)
-            .GroupBy(entry => (ushort)entry.MobyOClass!.Value)
+            .SelectMany(entry => GetMobyOClasses(entry).Select(oClass => (oClass, entry)))
+            .GroupBy(item => item.oClass)
             .ToDictionary(
                 group => group.Key,
                 group =>
                 {
-                    var entry = group.First();
-                    return new DlMpPvarMetadata(entry.Name!, entry.Length!.Value);
+                    var entry = group.First().entry;
+                    return new DlMpPvarMetadata(entry.Name!, entry.Length!.Value, entry.NetObjectDataType);
                 });
+    }
+
+    private static IEnumerable<ushort> GetMobyOClasses(PvarOverlayEntry entry)
+    {
+        if (entry.MobyOClass is >= ushort.MinValue and <= ushort.MaxValue)
+        {
+            yield return (ushort)entry.MobyOClass.Value;
+        }
+
+        foreach (var oClass in entry.MobyOClasses ?? [])
+        {
+            if (oClass is >= ushort.MinValue and <= ushort.MaxValue)
+            {
+                yield return (ushort)oClass;
+            }
+        }
     }
 
     private sealed class PvarOverlayEntry
@@ -81,6 +97,8 @@ public sealed class DlMpPvarOverlay
         public string? Name { get; init; }
         public int? RCVersion { get; init; }
         public int? MobyOClass { get; init; }
+        public IReadOnlyList<int>? MobyOClasses { get; init; }
+        public string? NetObjectDataType { get; init; }
         public int? Length { get; init; }
     }
 }

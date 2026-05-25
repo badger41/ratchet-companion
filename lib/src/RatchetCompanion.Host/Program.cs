@@ -60,7 +60,7 @@ try
     };
     var websocketStatusInterval = TimeSpan.FromMilliseconds(appOptions.Polling.WebsocketStatusMilliseconds);
     var websocketMemoryInterval = TimeSpan.FromMilliseconds(appOptions.Polling.WebsocketMemoryMilliseconds);
-    const int MaxWebsocketMemoryBytes = 4096;
+    const int MaxWebsocketMemoryBytes = 0x4000;
 
     app.UseCors();
     app.UseWebSockets();

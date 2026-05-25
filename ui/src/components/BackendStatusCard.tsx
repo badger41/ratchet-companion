@@ -3,7 +3,7 @@ import {
   ColumnLayout,
   SpaceBetween,
 } from '@cloudscape-design/components';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { MobyListCard } from './MobyListCard';
 import { MobyInfoCard } from './MobyInfoCard';
 import { PlayerCard } from './PlayerCard';
@@ -25,16 +25,24 @@ export function BackendStatusCard({ status, error }: BackendStatusCardProps) {
   const [selectedMobyPointer, setSelectedMobyPointer] = useState<number | null>(
     null,
   );
+  const [lastMobys, setLastMobys] = useState<MobySummary[]>([]);
   const detectionGameId = getNumericGameId(status);
   const isUyaGame = isUyaStatus(status);
   const hasMobySnapshot = isRatchetMobyStatus(status);
   const ratchetSnapshot = getRatchetMapSnapshot(status);
+  const liveMobys = ratchetSnapshot?.mobys ?? [];
+  const displayMobys = liveMobys.length > 0 ? liveMobys : lastMobys;
+
+  useEffect(() => {
+    if (liveMobys.length > 0) {
+      setLastMobys(liveMobys);
+    }
+  }, [liveMobys]);
+
   const selectedMoby = useMemo(
     () =>
-      ratchetSnapshot?.mobys.find(
-        (moby) => moby.pointer === selectedMobyPointer,
-      ) ?? null,
-    [selectedMobyPointer, ratchetSnapshot?.mobys],
+      displayMobys.find((moby) => moby.pointer === selectedMobyPointer) ?? null,
+    [selectedMobyPointer, displayMobys],
   );
 
   return (
@@ -53,7 +61,7 @@ export function BackendStatusCard({ status, error }: BackendStatusCardProps) {
         <ColumnLayout columns={selectedMoby ? 2 : 1}>
           <MobyListCard
             title="Mobys"
-            mobys={ratchetSnapshot?.mobys ?? []}
+            mobys={displayMobys}
             gameId={detectionGameId}
             showAllocationTabs={detectionGameId !== 4}
             selectedMoby={selectedMoby}

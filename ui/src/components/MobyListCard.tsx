@@ -44,17 +44,18 @@ export function MobyListCard({
       ? dynamicMobys
       : staticMobys
     : mobys;
+  const hasNetObjectPointers = useMemo(
+    () => mobys.some((moby) => typeof moby.netObjectPointer === 'number'),
+    [mobys],
+  );
 
   const columnDefinitions: TableProps.ColumnDefinition<MobySummary>[] = [
     {
       id: 'name',
       header: 'Name',
-      cell: (moby) =>
-        getMobyName(moby.oClass, gameId) ?? formatOClass(moby.oClass),
+      cell: (moby) => getDisplayName(moby, gameId),
       sortingComparator: (a, b) =>
-        (getMobyName(a.oClass, gameId) ?? formatOClass(a.oClass)).localeCompare(
-          getMobyName(b.oClass, gameId) ?? formatOClass(b.oClass),
-        ),
+        getDisplayName(a, gameId).localeCompare(getDisplayName(b, gameId)),
       isRowHeader: true,
     },
     {
@@ -69,6 +70,20 @@ export function MobyListCard({
       cell: (moby) => formatPointer(moby.pointer),
       sortingComparator: (a, b) => a.pointer - b.pointer,
     },
+    ...(hasNetObjectPointers
+      ? [
+          {
+            id: 'netObject',
+            header: 'Net object',
+            cell: (moby: MobySummary) =>
+              typeof moby.netObjectPointer === 'number'
+                ? formatPointer(moby.netObjectPointer)
+                : '—',
+            sortingComparator: (a: MobySummary, b: MobySummary) =>
+              (a.netObjectPointer ?? 0) - (b.netObjectPointer ?? 0),
+          },
+        ]
+      : []),
   ];
 
   const tabs: TabsProps.Tab[] = [
@@ -138,5 +153,14 @@ export function MobyListCard({
         }}
       />
     </div>
+  );
+}
+
+function getDisplayName(moby: MobySummary, gameId: number) {
+  return (
+    moby.name ??
+    moby.pvar?.name ??
+    getMobyName(moby.oClass, gameId) ??
+    formatOClass(moby.oClass)
   );
 }

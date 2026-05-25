@@ -9,7 +9,7 @@ import { loadPvarOverlay } from './services/pvarOverlay';
 function App() {
   const { status, error, isPending, toggleConnection } = useBackendStatus();
   const [isSettingsVisible, setIsSettingsVisible] = useState(false);
-  const [pvarOverlayVersion, setPvarOverlayVersion] = useState(0);
+  const [, setPvarOverlayVersion] = useState(0);
 
   useEffect(() => {
     let isCurrent = true;
@@ -50,11 +50,7 @@ function App() {
       />
       <Box padding="l">
         <SpaceBetween size="l">
-          <BackendStatusCard
-            key={pvarOverlayVersion}
-            status={status}
-            error={error}
-          />
+          <BackendStatusCard status={status} error={error} />
         </SpaceBetween>
       </Box>
     </>

@@ -4,7 +4,12 @@ namespace RatchetCompanion.Games.UYA.MP;
 
 public sealed record UyaMpMobyPvarSummary(uint Pointer, int ByteCount, string Name);
 
-public sealed record UyaMpMobySummary(uint Pointer, ushort OClass, bool IsDynamic, UyaMpMobyPvarSummary? Pvar);
+public sealed record UyaMpMobySummary(
+    uint Pointer,
+    ushort OClass,
+    string? Name,
+    bool IsDynamic,
+    UyaMpMobyPvarSummary? Pvar);
 
 public sealed record UyaMpMobyListData(
     IReadOnlyList<UyaMpMobySummary> Mobys,
@@ -101,12 +106,14 @@ public sealed class UyaMpMobyMemory
             {
                 var offset = i * MobySize;
                 var oClass = BitConverter.ToUInt16(staticBytes, offset + OClassOffset);
+                var metadata = _pvarOverlay.Find(oClass);
 
                 mobys.Add(new UyaMpMobySummary(
                     Pointer: staticStart + (uint)offset,
                     OClass: oClass,
+                    Name: metadata?.Name,
                     IsDynamic: false,
-                    Pvar: CreatePvarSummary(staticBytes, offset, oClass)));
+                    Pvar: CreatePvarSummary(staticBytes, offset, metadata)));
             }
         }
 
@@ -134,12 +141,14 @@ public sealed class UyaMpMobyMemory
 
                 dynamicCount++;
                 var oClass = BitConverter.ToUInt16(dynamicBytes, offset + OClassOffset);
+                var metadata = _pvarOverlay.Find(oClass);
 
                 mobys.Add(new UyaMpMobySummary(
                     Pointer: staticEnd + (uint)offset,
                     OClass: oClass,
+                    Name: metadata?.Name,
                     IsDynamic: true,
-                    Pvar: CreatePvarSummary(dynamicBytes, offset, oClass)));
+                    Pvar: CreatePvarSummary(dynamicBytes, offset, metadata)));
             }
         }
 
@@ -165,9 +174,8 @@ public sealed class UyaMpMobyMemory
         return true;
     }
 
-    private UyaMpMobyPvarSummary? CreatePvarSummary(byte[] mobyBytes, int mobyOffset, ushort oClass)
+    private static UyaMpMobyPvarSummary? CreatePvarSummary(byte[] mobyBytes, int mobyOffset, UyaMpPvarMetadata? metadata)
     {
-        var metadata = _pvarOverlay.Find(oClass);
         if (metadata is null)
         {
             return null;

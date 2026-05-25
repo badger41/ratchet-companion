@@ -4,6 +4,8 @@ type PvarOverlayEntry = {
   Name?: string;
   RCVersion?: number;
   MobyOClass?: number;
+  MobyOClasses?: number[];
+  NetObjectDataType?: string;
   Overlay?: PvarOverlayField[];
 };
 
@@ -21,14 +23,10 @@ export type PvarOverlayField = {
 
 function filterEntries(overlay: PvarOverlayEntry[]) {
   return overlay.filter(
-    (
-      entry,
-    ): entry is Required<
-      Pick<PvarOverlayEntry, 'Name' | 'MobyOClass' | 'RCVersion'>
-    > &
-      PvarOverlayEntry =>
+    (entry): entry is PvarOverlayEntry & { Name: string; RCVersion: number } =>
       typeof entry.Name === 'string' &&
-      typeof entry.MobyOClass === 'number' &&
+      (typeof entry.MobyOClass === 'number' ||
+        Array.isArray(entry.MobyOClasses)) &&
       typeof entry.RCVersion === 'number',
   );
 }
@@ -37,7 +35,9 @@ function createMobyNameLookup(entries: ReturnType<typeof filterEntries>) {
   return entries.reduce<RCMobyLookup>((lookup, entry) => {
     const versionLookup =
       lookup.get(entry.RCVersion) ?? new Map<number, string>();
-    versionLookup.set(entry.MobyOClass, entry.Name);
+    for (const oClass of getMobyOClasses(entry)) {
+      versionLookup.set(oClass, entry.Name);
+    }
     lookup.set(entry.RCVersion, versionLookup);
     return lookup;
   }, new Map<number, Map<number, string>>());
@@ -69,7 +69,9 @@ function createPvarFieldLookup(entries: ReturnType<typeof filterEntries>) {
 
     const versionLookup =
       lookup.get(entry.RCVersion) ?? new Map<number, PvarOverlayField[]>();
-    versionLookup.set(entry.MobyOClass, overlayFields);
+    for (const oClass of getMobyOClasses(entry)) {
+      versionLookup.set(oClass, overlayFields);
+    }
     lookup.set(entry.RCVersion, versionLookup);
     return lookup;
   }, new Map<number, Map<number, PvarOverlayField[]>>());
@@ -83,6 +85,15 @@ export function setPvarOverlayEntries(overlay: PvarOverlayEntry[]) {
   entries = filterEntries(overlay);
   mobyNamesByVersion = createMobyNameLookup(entries);
   pvarFieldsByVersion = createPvarFieldLookup(entries);
+}
+
+function getMobyOClasses(entry: PvarOverlayEntry) {
+  return [
+    ...(typeof entry.MobyOClass === 'number' ? [entry.MobyOClass] : []),
+    ...(entry.MobyOClasses ?? []).filter(
+      (oClass): oClass is number => typeof oClass === 'number',
+    ),
+  ];
 }
 
 export function getMobyName(oClass: number, rcVersion: number): string | null {

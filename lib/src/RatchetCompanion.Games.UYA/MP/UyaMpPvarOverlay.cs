@@ -64,16 +64,32 @@ public sealed class UyaMpPvarOverlay
             .Where(entry =>
                 entry.RCVersion == UyaRcVersion &&
                 !string.IsNullOrWhiteSpace(entry.Name) &&
-                entry.MobyOClass is >= ushort.MinValue and <= ushort.MaxValue &&
                 entry.Length is > 0)
-            .GroupBy(entry => (ushort)entry.MobyOClass!.Value)
+            .SelectMany(entry => GetMobyOClasses(entry).Select(oClass => (oClass, entry)))
+            .GroupBy(item => item.oClass)
             .ToDictionary(
                 group => group.Key,
                 group =>
                 {
-                    var entry = group.First();
+                    var entry = group.First().entry;
                     return new UyaMpPvarMetadata(entry.Name!, entry.Length!.Value);
                 });
+    }
+
+    private static IEnumerable<ushort> GetMobyOClasses(PvarOverlayEntry entry)
+    {
+        if (entry.MobyOClass is >= ushort.MinValue and <= ushort.MaxValue)
+        {
+            yield return (ushort)entry.MobyOClass.Value;
+        }
+
+        foreach (var oClass in entry.MobyOClasses ?? [])
+        {
+            if (oClass is >= ushort.MinValue and <= ushort.MaxValue)
+            {
+                yield return (ushort)oClass;
+            }
+        }
     }
 
     private sealed class PvarOverlayEntry
@@ -81,6 +97,7 @@ public sealed class UyaMpPvarOverlay
         public string? Name { get; init; }
         public int? RCVersion { get; init; }
         public int? MobyOClass { get; init; }
+        public IReadOnlyList<int>? MobyOClasses { get; init; }
         public int? Length { get; init; }
     }
 }

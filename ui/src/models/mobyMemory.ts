@@ -3,6 +3,7 @@ import type { PlayerPosition } from './gameData';
 const MOBY_MEMORY_SIZE = 0x100;
 const POSITION_OFFSET = 0x10;
 const P_CLASS_OFFSET = 0x24;
+const DL_NET_OBJECT_OFFSET = 0x90;
 const UYA_P_UPDATE_OFFSET = 0x64;
 const UYA_P_VAR_OFFSET = 0x68;
 const DL_P_UPDATE_OFFSET = 0xa8;
@@ -13,6 +14,7 @@ export const mobyMemoryByteCount = MOBY_MEMORY_SIZE;
 export type MobyMemory = {
   position: PlayerPosition;
   pClass: number;
+  netObject: number | null;
   pUpdate: number;
   pVar: number;
 };
@@ -32,6 +34,7 @@ export function parseMobyMemory(bytes: Uint8Array | null): MobyMemory | null {
       z: view.getFloat32(POSITION_OFFSET + 0x8, true),
     },
     pClass: view.getUint32(P_CLASS_OFFSET, true),
+    netObject: null,
     pUpdate: view.getUint32(layout.pUpdateOffset, true),
     pVar: view.getUint32(layout.pVarOffset, true),
   };
@@ -55,6 +58,9 @@ export function parseMobyMemoryForGame(
       z: view.getFloat32(POSITION_OFFSET + 0x8, true),
     },
     pClass: view.getUint32(P_CLASS_OFFSET, true),
+    netObject: layout.netObjectOffset
+      ? view.getUint32(layout.netObjectOffset, true)
+      : null,
     pUpdate: view.getUint32(layout.pUpdateOffset, true),
     pVar: view.getUint32(layout.pVarOffset, true),
   };
@@ -65,11 +71,13 @@ function getMobyMemoryLayout(gameId = 3) {
     return {
       pUpdateOffset: DL_P_UPDATE_OFFSET,
       pVarOffset: DL_P_VAR_OFFSET,
+      netObjectOffset: DL_NET_OBJECT_OFFSET,
     };
   }
 
   return {
     pUpdateOffset: UYA_P_UPDATE_OFFSET,
     pVarOffset: UYA_P_VAR_OFFSET,
+    netObjectOffset: null,
   };
 }

@@ -9,6 +9,7 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddDLModule(this IServiceCollection services)
     {
         services.AddSingleton<DlMpPvarOverlay>();
+        services.AddSingleton<DlMpNetObjectCatalog>();
         services.AddSingleton<DlMpMobyMemory>();
         services.AddSingleton<IGameModule, DlGameModule>();
         return services;

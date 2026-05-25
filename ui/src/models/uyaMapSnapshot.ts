@@ -3,6 +3,8 @@ import type { MobySummary, PlayerPosition } from './gameData';
 
 const UYA_GAME_ID = '3';
 const UYA_GAME_KEY = 'UYA';
+const DL_GAME_ID = '4';
+const DL_GAME_KEY = 'DL';
 
 export type UyaMapSnapshot = {
   currentMapId: string | null;
@@ -23,7 +25,17 @@ export function isRatchetMobyStatus(status: StatusResponse | null) {
 }
 
 export function getNumericGameId(status: StatusResponse | null) {
-  return Number(status?.detection.gameId ?? 0);
+  const gameId = String(status?.detection.gameId ?? 'Unknown');
+
+  if (gameId === UYA_GAME_ID || gameId === UYA_GAME_KEY) {
+    return 3;
+  }
+
+  if (gameId === DL_GAME_ID || gameId === DL_GAME_KEY) {
+    return 4;
+  }
+
+  return 0;
 }
 
 export function getUyaMapSnapshot(
