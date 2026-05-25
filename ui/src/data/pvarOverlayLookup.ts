@@ -19,28 +19,32 @@ export type PvarOverlayField = {
   Order?: number;
 };
 
-const entries = (pvarOverlay as PvarOverlayEntry[]).filter(
-  (
-    entry,
-  ): entry is Required<
-    Pick<PvarOverlayEntry, 'Name' | 'MobyOClass' | 'RCVersion'>
-  > &
-    PvarOverlayEntry =>
-    typeof entry.Name === 'string' &&
-    typeof entry.MobyOClass === 'number' &&
-    typeof entry.RCVersion === 'number',
-);
+function filterEntries(overlay: PvarOverlayEntry[]) {
+  return overlay.filter(
+    (
+      entry,
+    ): entry is Required<
+      Pick<PvarOverlayEntry, 'Name' | 'MobyOClass' | 'RCVersion'>
+    > &
+      PvarOverlayEntry =>
+      typeof entry.Name === 'string' &&
+      typeof entry.MobyOClass === 'number' &&
+      typeof entry.RCVersion === 'number',
+  );
+}
 
-const mobyNamesByVersion = entries.reduce<RCMobyLookup>((lookup, entry) => {
-  const versionLookup =
-    lookup.get(entry.RCVersion) ?? new Map<number, string>();
-  versionLookup.set(entry.MobyOClass, entry.Name);
-  lookup.set(entry.RCVersion, versionLookup);
-  return lookup;
-}, new Map<number, Map<number, string>>());
+function createMobyNameLookup(entries: ReturnType<typeof filterEntries>) {
+  return entries.reduce<RCMobyLookup>((lookup, entry) => {
+    const versionLookup =
+      lookup.get(entry.RCVersion) ?? new Map<number, string>();
+    versionLookup.set(entry.MobyOClass, entry.Name);
+    lookup.set(entry.RCVersion, versionLookup);
+    return lookup;
+  }, new Map<number, Map<number, string>>());
+}
 
-const pvarFieldsByVersion = entries.reduce<RCPvarOverlayLookup>(
-  (lookup, entry) => {
+function createPvarFieldLookup(entries: ReturnType<typeof filterEntries>) {
+  return entries.reduce<RCPvarOverlayLookup>((lookup, entry) => {
     const overlayFields = (entry.Overlay ?? [])
       .filter(
         (
@@ -68,9 +72,18 @@ const pvarFieldsByVersion = entries.reduce<RCPvarOverlayLookup>(
     versionLookup.set(entry.MobyOClass, overlayFields);
     lookup.set(entry.RCVersion, versionLookup);
     return lookup;
-  },
-  new Map<number, Map<number, PvarOverlayField[]>>(),
-);
+  }, new Map<number, Map<number, PvarOverlayField[]>>());
+}
+
+let entries = filterEntries(pvarOverlay as PvarOverlayEntry[]);
+let mobyNamesByVersion = createMobyNameLookup(entries);
+let pvarFieldsByVersion = createPvarFieldLookup(entries);
+
+export function setPvarOverlayEntries(overlay: PvarOverlayEntry[]) {
+  entries = filterEntries(overlay);
+  mobyNamesByVersion = createMobyNameLookup(entries);
+  pvarFieldsByVersion = createPvarFieldLookup(entries);
+}
 
 export function getMobyName(oClass: number, rcVersion: number): string | null {
   if (rcVersion !== null) {

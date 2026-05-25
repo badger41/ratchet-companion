@@ -13,6 +13,9 @@ on:
 permissions:
   contents: read
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build:
     name: Build ${{ matrix.platform }}
@@ -25,14 +28,12 @@ jobs:
             os: ubuntu-latest
             script: build:linux
             artifact-name: ratchet-companion-linux
-            artifact-path: build/release-linux/*.AppImage
+            artifact-path: build/release-package/ratchet-companion-linux.zip
           - platform: windows
             os: windows-latest
             script: build:windows
             artifact-name: ratchet-companion-windows
-            artifact-path: |
-              build/release-win/*.exe
-              build/release-win/*.zip
+            artifact-path: build/release-package/ratchet-companion-windows.zip
 
     steps:
       - name: Check out repository
@@ -46,7 +47,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
           cache-dependency-path: ui/package-lock.json
 
@@ -66,6 +67,24 @@ jobs:
 
       - name: Build package
         run: npm run ${{ matrix.script }}
+
+      - name: Create Linux release zip
+        if: matrix.platform == 'linux'
+        shell: bash
+        run: |
+          mkdir -p build/release-package
+          zip -j build/release-package/ratchet-companion-linux.zip build/release-linux/*.AppImage build/release-linux/pvar_overlay.json
+
+      - name: Create Windows release zip
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force build/release-package | Out-Null
+          $app = Get-ChildItem build/release-win -Filter *.exe | Select-Object -First 1
+          if (-not $app) {
+            throw "No Windows executable found in build/release-win"
+          }
+          Compress-Archive -Path @($app.FullName, (Resolve-Path build/release-win/pvar_overlay.json).Path) -DestinationPath build/release-package/ratchet-companion-windows.zip -Force
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4

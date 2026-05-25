@@ -114,6 +114,19 @@ function getConfiguredBackendBaseUrl() {
   }
 }
 
+function getExternalPvarOverlayPath() {
+  if (!app.isPackaged) {
+    return path.resolve(__dirname, '..', 'src', 'data', 'pvar_overlay.json');
+  }
+
+  const appExecutablePath =
+    process.platform === 'linux' && process.env.APPIMAGE
+      ? process.env.APPIMAGE
+      : process.execPath;
+
+  return path.join(path.dirname(appExecutablePath), 'pvar_overlay.json');
+}
+
 function ensureLogPaths() {
   if (logDirectory && mainLogPath && backendLogPath) {
     return;
@@ -198,6 +211,7 @@ function startBundledBackend() {
     env: {
       ...process.env,
       RATCHET_COMPANION_LOG_DIR: logDirectory ?? backendWorkingDirectory,
+      RATCHET_COMPANION_PVAR_OVERLAY_PATH: getExternalPvarOverlayPath(),
     },
   });
 

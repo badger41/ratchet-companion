@@ -94,8 +94,11 @@ That flow now:
 Expected output:
 
 - `build/release-linux/Ratchet Companion-0.0.0-x86_64.AppImage`
+- `build/release-linux/pvar_overlay.json`
 
 The packaged Electron app starts the bundled backend automatically from its `resources/backend/` folder in production.
+The `pvar_overlay.json` file is intentionally copied next to the AppImage so pvar
+documentation changes can be made without rebuilding the app.
 
 The Linux production build is now orchestrated from the repo root. Root-level scripts own the cross-project product build, while `ui/` is limited to UI-local build steps like renderer and Electron compilation.
 
@@ -134,8 +137,54 @@ These flows publish the backend for `win-x64`, build the UI/Electron assets, and
 - `build/release-win/`
 - `build/release-win-framework/`
 
+The build also copies `pvar_overlay.json` into the release directory next to the
+portable Windows executable.
+
 Notes:
 
 - the Windows packaging config lives in `ui/electron-builder.windows.json`
 - the current Windows target is `zip`, which is a safe cross-platform artifact to generate from Linux
 - installer-style targets like NSIS usually require additional Windows-oriented tooling such as `wine` and `makensis`
+
+## GitHub Actions builds and releases
+
+GitHub Actions builds Linux and Windows packages from `.github/workflows/build.yml`.
+
+Normal pushes to `main` run autobuilds and upload workflow artifacts. Release builds
+are tag-driven and create a GitHub Release only when the workflow is triggered by a
+tag that starts with `v`.
+
+The order matters:
+
+```bash
+git add .github/workflows/build.yml scripts/build-linux.mjs scripts/build-windows.mjs README.md
+git commit -m "Add GitHub Actions builds and release docs"
+git push origin main
+
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+Do not push the tag before the workflow commit is on `main`. GitHub can show the tag
+while still showing the Actions "getting started" page if the default branch does
+not contain the workflow file yet.
+
+If a tag was pushed too early, delete and recreate it after pushing `main`:
+
+```bash
+git push origin :refs/tags/v0.1.0
+git tag -d v0.1.0
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+For a tag like `v0.1.0`, CI temporarily builds with version `0.1.0` and attaches
+two release archives to the GitHub Release:
+
+- `ratchet-companion-linux.zip` — contains the AppImage and `pvar_overlay.json`
+- `ratchet-companion-windows.zip` — contains the portable Windows executable and `pvar_overlay.json`
+
+To inspect a skipped release job, open the workflow run in GitHub Actions and check
+the run ref near the top. A run for `refs/heads/main` skips the release job by
+design; a run for `refs/tags/v0.1.0` should publish the release after both platform
+builds succeed.

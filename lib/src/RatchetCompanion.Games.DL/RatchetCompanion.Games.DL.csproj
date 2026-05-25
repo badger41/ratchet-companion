@@ -11,8 +11,4 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
-  <ItemGroup>
-    <EmbeddedResource Include="../../../ui/src/data/pvar_overlay.json" LogicalName="RatchetCompanion.Games.DL.Data.pvar_overlay.json" />
-  </ItemGroup>
-
 </Project>

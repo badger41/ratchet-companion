@@ -7,6 +7,7 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const repoRoot = path.resolve(__dirname, '..')
 const uiRoot = path.join(repoRoot, 'ui')
+const pvarOverlaySource = path.join(uiRoot, 'src', 'data', 'pvar_overlay.json')
 const backendProject = path.join(repoRoot, 'lib', 'src', 'RatchetCompanion.Host', 'RatchetCompanion.Host.csproj')
 const buildRoot = path.join(repoRoot, 'build')
 const backendOutput = path.join(buildRoot, 'artifacts', 'backend-win-x64')
@@ -86,3 +87,4 @@ await run(
   ['electron-builder', '--config', 'electron-builder.windows.json', '--win', `-c.directories.output=${releaseDirectory}`],
   { cwd: uiRoot },
 )
+await fs.copyFile(pvarOverlaySource, path.join(releaseDirectory, 'pvar_overlay.json'))

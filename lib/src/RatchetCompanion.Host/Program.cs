@@ -1,4 +1,5 @@
 using RatchetCompanion.Core;
+using RatchetCompanion.Core.Data;
 using RatchetCompanion.Core.Games;
 using RatchetCompanion.Core.PCSX2;
 using RatchetCompanion.Games.DL;
@@ -82,6 +83,22 @@ try
             module.DisplayName,
             module.Capabilities,
         })));
+
+    app.MapGet("/api/pvar-overlay", () =>
+    {
+        var overlayPath = PvarOverlayFile.ResolvePath();
+
+        if (!File.Exists(overlayPath))
+        {
+            return Results.NotFound(new
+            {
+                fileName = PvarOverlayFile.FileName,
+                path = overlayPath,
+            });
+        }
+
+        return Results.File(overlayPath, "application/json");
+    });
 
     app.MapGet("/api/status", async (StatusSnapshotFactory snapshotFactory, CancellationToken cancellationToken) =>
     {
