@@ -19,9 +19,14 @@ import {
 type BackendStatusCardProps = {
   status: StatusResponse | null;
   error: string | null;
+  pvarOverlayDataVersion: number;
 };
 
-export function BackendStatusCard({ status, error }: BackendStatusCardProps) {
+export function BackendStatusCard({
+  status,
+  error,
+  pvarOverlayDataVersion,
+}: BackendStatusCardProps) {
   const [selectedMobyPointer, setSelectedMobyPointer] = useState<number | null>(
     null,
   );
@@ -70,7 +75,11 @@ export function BackendStatusCard({ status, error }: BackendStatusCardProps) {
             }
           />
           {selectedMoby ? (
-            <MobyInfoCard moby={selectedMoby} gameId={detectionGameId} />
+            <MobyInfoCard
+              moby={selectedMoby}
+              gameId={detectionGameId}
+              pvarOverlayDataVersion={pvarOverlayDataVersion}
+            />
           ) : null}
         </ColumnLayout>
       ) : null}

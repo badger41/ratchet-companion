@@ -33,9 +33,14 @@ type NetObjectViewMode = 'fields' | 'raw';
 type MobyInfoCardProps = {
   moby: MobySummary | null;
   gameId: number;
+  pvarOverlayDataVersion: number;
 };
 
-export function MobyInfoCard({ moby, gameId }: MobyInfoCardProps) {
+export function MobyInfoCard({
+  moby,
+  gameId,
+  pvarOverlayDataVersion,
+}: MobyInfoCardProps) {
   const [pvarViewMode, setPvarViewMode] = useState<PvarViewMode>('overlay');
   const [netObjectViewMode, setNetObjectViewMode] =
     useState<NetObjectViewMode>('fields');
@@ -59,7 +64,7 @@ export function MobyInfoCard({ moby, gameId }: MobyInfoCardProps) {
   );
   const pvarFields = useMemo(
     () => getPvarOverlayFields(moby?.oClass ?? 0, overlayVersion),
-    [moby?.oClass, overlayVersion],
+    [moby?.oClass, overlayVersion, pvarOverlayDataVersion],
   );
   const pvarHighlights = useMemo(
     () => createPvarHighlights(pvarFields),
@@ -563,6 +568,7 @@ function getDefaultPvarFieldByteCount(dataType: string | undefined) {
     case 'MobyRefPVarValue':
     case 'MobyRefState':
     case 'PathGraphRef':
+    case 'Pointer':
     case 'SplineRef':
     case 'TieGroupId':
       return 4;
@@ -571,6 +577,8 @@ function getDefaultPvarFieldByteCount(dataType: string | undefined) {
       return 8;
     case 'Vector3':
       return 12;
+    case 'Vector4':
+      return 16;
     default:
       return 4;
   }

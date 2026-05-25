@@ -77,12 +77,13 @@ function createPvarFieldLookup(entries: ReturnType<typeof filterEntries>) {
   }, new Map<number, Map<number, PvarOverlayField[]>>());
 }
 
-let entries = filterEntries(pvarOverlay as PvarOverlayEntry[]);
+const bundledEntries = filterEntries(pvarOverlay as PvarOverlayEntry[]);
+let entries = bundledEntries;
 let mobyNamesByVersion = createMobyNameLookup(entries);
 let pvarFieldsByVersion = createPvarFieldLookup(entries);
 
 export function setPvarOverlayEntries(overlay: PvarOverlayEntry[]) {
-  entries = filterEntries(overlay);
+  entries = [...bundledEntries, ...filterEntries(overlay)];
   mobyNamesByVersion = createMobyNameLookup(entries);
   pvarFieldsByVersion = createPvarFieldLookup(entries);
 }

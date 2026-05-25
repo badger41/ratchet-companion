@@ -12,7 +12,7 @@ const preserveHexViewColorsClassName = 'preserve-hex-view-colors';
 function App() {
   const { status, error, isPending, toggleConnection } = useBackendStatus();
   const [isSettingsVisible, setIsSettingsVisible] = useState(false);
-  const [, setPvarOverlayVersion] = useState(0);
+  const [pvarOverlayDataVersion, setPvarOverlayDataVersion] = useState(0);
 
   useEffect(() => {
     let isCurrent = true;
@@ -21,7 +21,7 @@ function App() {
       void loadPvarOverlay()
         .then((didChange) => {
           if (isCurrent && didChange) {
-            setPvarOverlayVersion((version) => version + 1);
+            setPvarOverlayDataVersion((version) => version + 1);
           }
         })
         .catch((error: unknown) => {
@@ -76,7 +76,11 @@ function App() {
       />
       <Box padding="l">
         <SpaceBetween size="l">
-          <BackendStatusCard status={status} error={error} />
+          <BackendStatusCard
+            status={status}
+            error={error}
+            pvarOverlayDataVersion={pvarOverlayDataVersion}
+          />
         </SpaceBetween>
       </Box>
     </>

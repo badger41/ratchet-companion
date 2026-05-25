@@ -6247,6 +6247,114 @@
     ]
   },
   {
+    "Name": "Dual Vipers",
+    "RCVersion": 4,
+    "MobyOClass": 4244,
+    "Length": 112,
+    "Overlay": [
+      {
+        "Name": "barrelPosTop",
+        "DataType": "Vector4",
+        "Offset": 0
+      },
+      {
+        "Name": "fireDir",
+        "DataType": "Vector4",
+        "Offset": 16
+      },
+      {
+        "Name": "vAimPos",
+        "DataType": "Vector4",
+        "Offset": 32
+      },
+      {
+        "Name": "targetPos",
+        "DataType": "Vector4",
+        "Offset": 48
+      },
+      {
+        "Name": "elecTimer",
+        "DataType": "Integer",
+        "Offset": 64,
+        "DataSize": 2
+      },
+      {
+        "Name": "M4244_ButtonTimer",
+        "DataType": "Integer",
+        "Offset": 66,
+        "DataSize": 2
+      },
+      {
+        "Name": "actuatorIdx",
+        "DataType": "Integer",
+        "Offset": 68
+      },
+      {
+        "Name": "pUser",
+        "DataType": "Pointer",
+        "Offset": 72
+      },
+      {
+        "Name": "targetUid",
+        "DataType": "Integer",
+        "Offset": 76
+      },
+      {
+        "Name": "M4244_PointLight",
+        "DataType": "Integer",
+        "Offset": 80
+      },
+      {
+        "Name": "M4244_FireFromTopBarrel",
+        "DataType": "Integer",
+        "Offset": 84,
+        "DataSize": 2
+      },
+      {
+        "Name": "M4244_OutAmmoFirstTime",
+        "DataType": "Integer",
+        "Offset": 86,
+        "DataSize": 2
+      },
+      {
+        "Name": "M4244_ScopeAng1",
+        "DataType": "Float",
+        "Offset": 88
+      },
+      {
+        "Name": "offButtonTimer",
+        "DataType": "Integer",
+        "Offset": 92
+      },
+      {
+        "Name": "pTarget",
+        "DataType": "MobyRef",
+        "Offset": 96
+      },
+      {
+        "Name": "pOtherGun",
+        "DataType": "MobyRef",
+        "Offset": 100
+      },
+      {
+        "Name": "cIsMainGun",
+        "DataType": "Bool",
+        "Offset": 104
+      },
+      {
+        "Name": "cpad",
+        "DataType": "Byte",
+        "Offset": 105,
+        "Count": 3
+      },
+      {
+        "Name": "ipad",
+        "DataType": "Integer",
+        "Offset": 108
+      }
+    ]
+  },
+  {
     "Name": "Player Moby",
     "RCVersion": 4,
     "MobyOClasses": [9500, 9501, 9502, 9503, 9504, 9505, 9506, 9507, 9508, 9509, 9510, 9511, 9512, 9513, 9514, 9515, 9516, 9517, 9518, 9519, 10046, 10044],
