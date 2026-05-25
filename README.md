@@ -150,9 +150,8 @@ Notes:
 
 GitHub Actions builds Linux and Windows packages from `.github/workflows/build.yml`.
 
-Normal pushes to `main` run autobuilds and upload workflow artifacts. Release builds
-are tag-driven and create a GitHub Release only when the workflow is triggered by a
-tag that starts with `v`.
+Builds are tag-driven. Normal pushes to `main` do not run Actions; GitHub only
+builds and creates a Release when a pushed tag starts with `v`.
 
 The order matters:
 
@@ -184,7 +183,6 @@ two release archives to the GitHub Release:
 - `ratchet-companion-linux.zip` — contains the AppImage and `pvar_overlay.json`
 - `ratchet-companion-windows.zip` — contains the portable Windows executable and `pvar_overlay.json`
 
-To inspect a skipped release job, open the workflow run in GitHub Actions and check
-the run ref near the top. A run for `refs/heads/main` skips the release job by
-design; a run for `refs/tags/v0.1.0` should publish the release after both platform
-builds succeed.
+The workflow should only appear for tag refs such as `refs/tags/v0.1.0`. If a
+release does not appear, open the tag workflow run in GitHub Actions and confirm
+both platform builds completed before the release job started.

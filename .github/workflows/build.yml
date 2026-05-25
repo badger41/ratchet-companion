@@ -2,13 +2,8 @@ name: Build
 
 on:
   push:
-    branches:
-      - main
-      - master
     tags:
       - v*
-  pull_request:
-  workflow_dispatch:
 
 permissions:
   contents: read
@@ -37,15 +32,15 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 9.0.x
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: npm
@@ -87,7 +82,7 @@ jobs:
           Compress-Archive -Path @($app.FullName, (Resolve-Path build/release-win/pvar_overlay.json).Path) -DestinationPath build/release-package/ratchet-companion-windows.zip -Force
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact-name }}
           path: ${{ matrix.artifact-path }}
@@ -103,13 +98,13 @@ jobs:
 
     steps:
       - name: Download build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           pattern: ratchet-companion-*
           path: release-assets
           merge-multiple: true
 
       - name: Publish release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: release-assets/**

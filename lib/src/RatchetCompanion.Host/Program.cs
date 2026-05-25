@@ -202,7 +202,9 @@ try
         }
     });
 
-    WriteStartupLog(startupLogPath, $"Backend configured. ConfigPath={configStore.ConfigPath}. Starting web host on {backendUrl}.");
+    WriteStartupLog(
+        startupLogPath,
+        $"Backend configured. ConfigPath={configStore.ConfigPath}. PvarOverlayPath={PvarOverlayFile.ResolvePath()}. Starting web host on {backendUrl}.");
     app.Run();
 }
 catch (Exception exception)

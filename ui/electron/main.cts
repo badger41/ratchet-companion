@@ -119,6 +119,10 @@ function getExternalPvarOverlayPath() {
     return path.resolve(__dirname, '..', 'src', 'data', 'pvar_overlay.json');
   }
 
+  if (process.platform === 'win32' && process.env.PORTABLE_EXECUTABLE_DIR) {
+    return path.join(process.env.PORTABLE_EXECUTABLE_DIR, 'pvar_overlay.json');
+  }
+
   const appExecutablePath =
     process.platform === 'linux' && process.env.APPIMAGE
       ? process.env.APPIMAGE
@@ -201,8 +205,10 @@ function startBundledBackend() {
     backendExecutable,
   );
   const backendWorkingDirectory = path.dirname(backendPath);
+  const pvarOverlayPath = getExternalPvarOverlayPath();
 
   logMain(`Starting bundled backend from ${backendPath}`);
+  logMain(`Using pvar overlay file ${pvarOverlayPath}`);
 
   backendProcess = spawn(backendPath, [], {
     cwd: backendWorkingDirectory,
@@ -211,7 +217,7 @@ function startBundledBackend() {
     env: {
       ...process.env,
       RATCHET_COMPANION_LOG_DIR: logDirectory ?? backendWorkingDirectory,
-      RATCHET_COMPANION_PVAR_OVERLAY_PATH: getExternalPvarOverlayPath(),
+      RATCHET_COMPANION_PVAR_OVERLAY_PATH: pvarOverlayPath,
     },
   });
 

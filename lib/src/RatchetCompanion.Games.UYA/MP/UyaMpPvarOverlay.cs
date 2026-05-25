@@ -24,6 +24,14 @@ public sealed class UyaMpPvarOverlay
 
         lock (_entriesLock)
         {
+            if (!File.Exists(path))
+            {
+                _entries = new Dictionary<ushort, UyaMpPvarMetadata>();
+                _entriesPath = path;
+                _entriesLastWriteTimeUtc = lastWriteTimeUtc;
+                return _entries;
+            }
+
             if (
                 string.Equals(_entriesPath, path, StringComparison.Ordinal) &&
                 _entriesLastWriteTimeUtc == lastWriteTimeUtc)
@@ -40,8 +48,18 @@ public sealed class UyaMpPvarOverlay
 
     private static IReadOnlyDictionary<ushort, UyaMpPvarMetadata> LoadEntries()
     {
-        using var stream = PvarOverlayFile.OpenRead();
-        var entries = JsonSerializer.Deserialize<List<PvarOverlayEntry>>(stream) ?? [];
+        List<PvarOverlayEntry> entries;
+
+        try
+        {
+            using var stream = PvarOverlayFile.OpenRead();
+            entries = JsonSerializer.Deserialize<List<PvarOverlayEntry>>(stream) ?? [];
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException)
+        {
+            return new Dictionary<ushort, UyaMpPvarMetadata>();
+        }
+
         return entries
             .Where(entry =>
                 entry.RCVersion == UyaRcVersion &&
