@@ -174,31 +174,34 @@ try
         }
 
         using var webSocket = await context.WebSockets.AcceptWebSocketAsync();
+        using var timer = new PeriodicTimer(websocketMemoryInterval);
         var cancellationToken = context.RequestAborted;
-        string? lastSentBytes = null;
+        byte[]? lastSentBytes = null;
 
         while (!cancellationToken.IsCancellationRequested && webSocket.State == WebSocketState.Open)
         {
             var currentValue = await pcsx2Runtime.ReadMemoryAsync(address, byteCount, cancellationToken);
-            var currentBytes = currentValue is null ? null : Convert.ToBase64String(currentValue);
 
-            if (!string.Equals(lastSentBytes, currentBytes, StringComparison.Ordinal))
+            if (!AreEqual(lastSentBytes, currentValue))
             {
-                var json = JsonSerializer.Serialize(
-                    new
-                    {
-                        address,
-                        byteCount,
-                        bytes = currentBytes,
-                    },
-                    websocketJsonOptions);
-
-                var payload = System.Text.Encoding.UTF8.GetBytes(json);
-                await webSocket.SendAsync(payload, WebSocketMessageType.Text, true, cancellationToken);
-                lastSentBytes = currentBytes;
+                if (currentValue is null)
+                {
+                    var json = JsonSerializer.Serialize(new { bytes = (string?)null }, websocketJsonOptions);
+                    var payload = System.Text.Encoding.UTF8.GetBytes(json);
+                    await webSocket.SendAsync(payload, WebSocketMessageType.Text, true, cancellationToken);
+                    lastSentBytes = null;
+                }
+                else
+                {
+                    await webSocket.SendAsync(currentValue, WebSocketMessageType.Binary, true, cancellationToken);
+                    lastSentBytes = [.. currentValue];
+                }
             }
 
-            await Task.Delay(websocketMemoryInterval, cancellationToken);
+            if (!await timer.WaitForNextTickAsync(cancellationToken))
+            {
+                break;
+            }
         }
     });
 
@@ -308,4 +311,19 @@ static void WriteStartupLog(string startupLogPath, string message)
     catch
     {
     }
+}
+
+static bool AreEqual(byte[]? left, byte[]? right)
+{
+    if (ReferenceEquals(left, right))
+    {
+        return true;
+    }
+
+    if (left is null || right is null || left.Length != right.Length)
+    {
+        return false;
+    }
+
+    return left.AsSpan().SequenceEqual(right);
 }

@@ -120,6 +120,7 @@ Current implementation direction:
 - Linux reader inspects `/proc/<pid>/fd/`
 - finds the FD pointing to `/dev/shm/pcsx2_<pid> (deleted)`
 - reads from that shared-memory-backed fd directly at EE offsets
+- caches the open shared-memory fd per process so repeated reads do not rescan `/proc/<pid>/fd/`
 
 ### Windows
 
@@ -135,6 +136,7 @@ This means the preferred Windows strategy is:
 - open the existing named mapping `pcsx2_<pid>`
 - map a read-only view
 - read EE RAM directly from offset `eeAddress`
+- cache the mapping handle/view per process so hot reads avoid reopening the named mapping
 
 That is much better than the earlier heuristic region scan and much better than UYA-specific calibration.
 
@@ -167,6 +169,7 @@ Therefore, generic large EE block reads are handled through direct PCSX2 memory 
 
 - watched memory polling was configured around 250 ms
 - websocket fallback interval was also brought down to 250 ms to better match observed responsiveness
+- `/ws/memory` sends byte payloads as binary websocket frames; JSON is only used for null/error-style payloads
 
 However, apparent update rate may still feel slower because total cycle time includes:
 - watcher loop wake-up

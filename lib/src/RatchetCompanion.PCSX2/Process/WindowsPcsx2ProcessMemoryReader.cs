@@ -24,21 +24,29 @@ public sealed class WindowsPcsx2ProcessMemoryReader(Pcsx2ProcessLocator processL
             return Task.FromResult<byte[]?>([]);
         }
 
-        if (_mappedProcessId.HasValue)
+        lock (_gate)
         {
-            var cachedBuffer = TryReadFromCachedMapping(_mappedProcessId.Value, eeAddress, byteCount);
-            if (cachedBuffer is not null)
+            if (_disposed)
             {
-                return Task.FromResult<byte[]?>(cachedBuffer);
+                return Task.FromResult<byte[]?>(null);
             }
-        }
 
-        foreach (var process in processLocator.FindRunningProcesses())
-        {
-            var buffer = TryReadFromCachedMapping(process.Id, eeAddress, byteCount);
-            if (buffer is not null)
+            if (_mappedProcessId.HasValue)
             {
-                return Task.FromResult<byte[]?>(buffer);
+                var cachedBuffer = TryReadFromCachedMapping(_mappedProcessId.Value, eeAddress, byteCount);
+                if (cachedBuffer is not null)
+                {
+                    return Task.FromResult<byte[]?>(cachedBuffer);
+                }
+            }
+
+            foreach (var process in processLocator.FindRunningProcesses())
+            {
+                var buffer = TryReadFromCachedMapping(process.Id, eeAddress, byteCount);
+                if (buffer is not null)
+                {
+                    return Task.FromResult<byte[]?>(buffer);
+                }
             }
         }
 
@@ -61,29 +69,25 @@ public sealed class WindowsPcsx2ProcessMemoryReader(Pcsx2ProcessLocator processL
 
     private byte[]? TryReadFromCachedMapping(int processId, uint eeAddress, int byteCount)
     {
-        lock (_gate)
+        if (!EnsureCachedMapping(processId))
         {
-            if (_disposed)
-            {
-                return null;
-            }
+            return null;
+        }
 
-            if (!EnsureCachedMapping(processId))
-            {
-                return null;
-            }
-
-            try
-            {
-                var buffer = new byte[byteCount];
-                Marshal.Copy(IntPtr.Add(_view, checked((int)eeAddress)), buffer, 0, byteCount);
-                return buffer;
-            }
-            catch
+        try
+        {
+            var buffer = new byte[byteCount];
+            Marshal.Copy(IntPtr.Add(_view, checked((int)eeAddress)), buffer, 0, byteCount);
+            return buffer;
+        }
+        catch
+        {
+            if (_mappedProcessId == processId)
             {
                 CloseCachedMapping();
-                return null;
             }
+
+            return null;
         }
     }
 

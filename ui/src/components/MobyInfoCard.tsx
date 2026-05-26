@@ -27,6 +27,7 @@ import { HexByteView, type HexByteHighlightRange } from './hex-byte-view';
 
 const UYA_PVAR_OVERLAY_VERSION = 3;
 const DL_PVAR_OVERLAY_VERSION = 4;
+type MobyTabId = 'summary' | 'pvar' | 'net-object';
 type PvarViewMode = 'overlay' | 'raw';
 type NetObjectViewMode = 'fields' | 'raw';
 
@@ -36,24 +37,24 @@ type MobyInfoCardProps = {
   pvarOverlayDataVersion: number;
 };
 
-export function MobyInfoCard({
-  moby,
-  gameId,
-  pvarOverlayDataVersion,
-}: MobyInfoCardProps) {
+export function MobyInfoCard({ moby, gameId }: MobyInfoCardProps) {
+  const [activeTabId, setActiveTabId] = useState<MobyTabId>('summary');
   const [pvarViewMode, setPvarViewMode] = useState<PvarViewMode>('overlay');
   const [netObjectViewMode, setNetObjectViewMode] =
     useState<NetObjectViewMode>('fields');
+  const isSummaryTabActive = activeTabId === 'summary';
+  const isPvarTabActive = activeTabId === 'pvar';
+  const isNetObjectTabActive = activeTabId === 'net-object';
   const { bytes, error } = useMemoryBlock(
-    moby?.pointer ?? null,
+    isSummaryTabActive ? (moby?.pointer ?? null) : null,
     mobyMemoryByteCount,
   );
   const { bytes: pvarBytes, error: pvarError } = useMemoryBlock(
-    moby?.pvar?.pointer ?? null,
+    isPvarTabActive ? (moby?.pvar?.pointer ?? null) : null,
     moby?.pvar?.byteCount ?? 0,
   );
   const { bytes: netObjectBytes, error: netObjectError } = useMemoryBlock(
-    moby?.netObject?.pointer ?? null,
+    isNetObjectTabActive ? (moby?.netObject?.pointer ?? null) : null,
     moby?.netObject?.byteCount ?? 0,
   );
   const overlayVersion =
@@ -62,10 +63,7 @@ export function MobyInfoCard({
     () => parseMobyMemoryForGame(bytes, gameId),
     [bytes, gameId],
   );
-  const pvarFields = useMemo(
-    () => getPvarOverlayFields(moby?.oClass ?? 0, overlayVersion),
-    [moby?.oClass, overlayVersion, pvarOverlayDataVersion],
-  );
+  const pvarFields = getPvarOverlayFields(moby?.oClass ?? 0, overlayVersion);
   const pvarHighlights = useMemo(
     () => createPvarHighlights(pvarFields),
     [pvarFields],
@@ -85,11 +83,7 @@ export function MobyInfoCard({
         <Header
           variant="h2"
           headingTagOverride="h3"
-          counter={
-            <Badge color={memory ? 'green' : 'grey'}>
-              {formatPointer(moby.pointer)}
-            </Badge>
-          }
+          counter={<Badge color="green">{formatPointer(moby.pointer)}</Badge>}
           description="Live memory details for the selected Moby."
         >
           Moby Info
@@ -98,6 +92,10 @@ export function MobyInfoCard({
     >
       <Tabs
         ariaLabel="Moby detail tabs"
+        activeTabId={activeTabId}
+        onChange={({ detail }) =>
+          setActiveTabId(detail.activeTabId as MobyTabId)
+        }
         tabs={[
           {
             id: 'summary',

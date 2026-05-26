@@ -7,8 +7,8 @@ import {
 const backendBaseUrl = getBackendBaseUrl();
 
 type MemoryBlockMessage = {
-  address: number;
-  byteCount: number;
+  address?: number;
+  byteCount?: number;
   bytes: string | null;
 };
 
@@ -31,7 +31,7 @@ export function useMemoryBlock(
   const [snapshot, setSnapshot] = useState<MemoryBlockSnapshot | null>(null);
 
   useEffect(() => {
-    if (address === null) {
+    if (address === null || byteCount <= 0) {
       return;
     }
 
@@ -39,43 +39,49 @@ export function useMemoryBlock(
     const socket = new WebSocket(
       getMemoryWebsocketUrl(backendBaseUrl, address, byteCount),
     );
+    socket.binaryType = 'arraybuffer';
 
-    socket.onmessage = ({ data }: { data: string }) => {
+    socket.onmessage = ({
+      data,
+    }: MessageEvent<string | ArrayBuffer | Blob>) => {
       if (!isActive) {
         return;
       }
 
-      try {
-        const payload = JSON.parse(data) as MemoryBlockMessage;
-        if (payload.address !== address || payload.byteCount !== byteCount) {
-          return;
-        }
+      void readMemoryBytes(data, address, byteCount)
+        .then((decodedBytes) => {
+          if (!isActive || decodedBytes === undefined) {
+            return;
+          }
 
-        setSnapshot((current) => {
-          const decodedBytes = payload.bytes
-            ? decodeBase64(payload.bytes)
-            : null;
-          const isCurrentBlock =
-            current?.address === address && current.byteCount === byteCount;
+          setSnapshot((current) => {
+            const isCurrentBlock =
+              current?.address === address && current.byteCount === byteCount;
 
-          return {
+            return {
+              address,
+              byteCount,
+              bytes: decodedBytes ?? (isCurrentBlock ? current.bytes : null),
+              error: null,
+            };
+          });
+        })
+        .catch((err: unknown) => {
+          if (!isActive) {
+            return;
+          }
+
+          setSnapshot((current) => ({
             address,
             byteCount,
-            bytes: decodedBytes ?? (isCurrentBlock ? current.bytes : null),
-            error: null,
-          };
+            bytes:
+              current?.address === address && current.byteCount === byteCount
+                ? current.bytes
+                : null,
+            error:
+              err instanceof Error ? err.message : 'Unknown memory payload',
+          }));
         });
-      } catch (err) {
-        setSnapshot((current) => ({
-          address,
-          byteCount,
-          bytes:
-            current?.address === address && current.byteCount === byteCount
-              ? current.bytes
-              : null,
-          error: err instanceof Error ? err.message : 'Unknown memory payload',
-        }));
-      }
     };
 
     socket.onerror = () => {
@@ -120,6 +126,30 @@ export function useMemoryBlock(
   return snapshot?.address === address && snapshot.byteCount === byteCount
     ? { bytes: snapshot.bytes, error: snapshot.error }
     : { bytes: null, error: null };
+}
+
+async function readMemoryBytes(
+  data: string | ArrayBuffer | Blob,
+  address: number,
+  byteCount: number,
+) {
+  if (data instanceof ArrayBuffer) {
+    return new Uint8Array(data);
+  }
+
+  if (data instanceof Blob) {
+    return new Uint8Array(await data.arrayBuffer());
+  }
+
+  const payload = JSON.parse(data) as MemoryBlockMessage;
+  if (
+    (payload.address !== undefined && payload.address !== address) ||
+    (payload.byteCount !== undefined && payload.byteCount !== byteCount)
+  ) {
+    return undefined;
+  }
+
+  return payload.bytes ? decodeBase64(payload.bytes) : null;
 }
 
 function decodeBase64(value: string) {
