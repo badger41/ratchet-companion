@@ -180,6 +180,17 @@ However, apparent update rate may still feel slower because total cycle time inc
 
 Future performance work should prefer caching expensive game-specific reads in backend services rather than rebuilding them repeatedly during snapshot creation.
 
+The status websocket should stay lightweight: connection state, detected game,
+module metadata, and small game status values. Feature data such as moby lists
+belongs behind feature-specific subscriptions, currently `/ws/mobys`, so status
+refreshes do not reset feature UI state or force expensive module reads.
+
+DL moby-list snapshots should not publish a single shrunk read immediately after
+publishing a larger populated list. While the game updates state, the spawnable
+moby count can briefly read as zero or individual entries can briefly look
+invalid, so smaller lists are confirmed across consecutive reads before
+replacing a larger snapshot.
+
 ## UI / Electron Packaging Notes
 
 ### UI structure

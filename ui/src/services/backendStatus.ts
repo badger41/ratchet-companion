@@ -8,6 +8,10 @@ export function getStatusWebsocketUrl(baseUrl: string) {
   return baseUrl.replace(/^http/, 'ws') + '/ws/status';
 }
 
+export function getMobyListWebsocketUrl(baseUrl: string) {
+  return baseUrl.replace(/^http/, 'ws') + '/ws/mobys';
+}
+
 export function getMemoryWebsocketUrl(
   baseUrl: string,
   address: number,

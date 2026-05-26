@@ -30,11 +30,16 @@ public sealed class DlMpMobyMemory
     private const int PVarOffset = 0xAC;
     private const int OClassOffset = 0xBC;
     private const int MaxMobyCapacity = 4096;
+    private const int ShrunkMobyListConfirmationReads = 2;
 
     private readonly IPcsx2Runtime _pcsx2Runtime;
     private readonly IWatchedMemoryTracker _watchedMemoryTracker;
     private readonly DlMpPvarOverlay _pvarOverlay;
     private readonly DlMpNetObjectCatalog _netObjectCatalog;
+    private readonly object _snapshotGate = new();
+    private DlMpMobyListData? _lastPublishedMobyList;
+    private DlMpMobyListData? _pendingShrunkMobyList;
+    private int _consecutiveShrunkMobyReads;
 
     public DlMpMobyMemory(
         IPcsx2Runtime pcsx2Runtime,
@@ -82,7 +87,7 @@ public sealed class DlMpMobyMemory
 
         if (spawnableCount == 0)
         {
-            return new DlMpMobyListData([], 0, 0, 0);
+            return PublishMobyList(new DlMpMobyListData([], 0, 0, 0));
         }
 
         _watchedMemoryTracker.WatchMemory($"dl.mp.mobys.{start:X8}", start, spawnableCount * MobySize);
@@ -116,7 +121,60 @@ public sealed class DlMpMobyMemory
                 NetObject: _netObjectCatalog.CreateSummary(netObjectPointer, metadata?.NetObjectDataType)));
         }
 
-        return new DlMpMobyListData(mobys, mobys.Count, 0, listCapacity);
+        return PublishMobyList(new DlMpMobyListData(mobys, mobys.Count, 0, listCapacity));
+    }
+
+    private DlMpMobyListData PublishMobyList(DlMpMobyListData mobyList)
+    {
+        lock (_snapshotGate)
+        {
+            if (_lastPublishedMobyList is { } lastPublishedMobyList &&
+                mobyList.Mobys.Count < lastPublishedMobyList.Mobys.Count)
+            {
+                if (HasSameMobyPointers(_pendingShrunkMobyList, mobyList))
+                {
+                    _consecutiveShrunkMobyReads++;
+                }
+                else
+                {
+                    _pendingShrunkMobyList = mobyList;
+                    _consecutiveShrunkMobyReads = 1;
+                }
+
+                if (_consecutiveShrunkMobyReads < ShrunkMobyListConfirmationReads)
+                {
+                    return lastPublishedMobyList;
+                }
+            }
+            else
+            {
+                _pendingShrunkMobyList = null;
+                _consecutiveShrunkMobyReads = 0;
+            }
+
+            _lastPublishedMobyList = mobyList;
+            _pendingShrunkMobyList = null;
+            _consecutiveShrunkMobyReads = 0;
+            return mobyList;
+        }
+    }
+
+    private static bool HasSameMobyPointers(DlMpMobyListData? left, DlMpMobyListData right)
+    {
+        if (left is null || left.Mobys.Count != right.Mobys.Count)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < left.Mobys.Count; i++)
+        {
+            if (left.Mobys[i].Pointer != right.Mobys[i].Pointer)
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static bool TryGetAlignedCount(uint start, uint end, out int count)

@@ -52,6 +52,7 @@ try
     builder.Services.AddUYAModule();
     builder.Services.AddDLModule();
     builder.Services.AddSingleton<StatusSnapshotFactory>();
+    builder.Services.AddSingleton<MobyListSnapshotFactory>();
 
     var app = builder.Build();
     var websocketJsonOptions = new JsonSerializerOptions
@@ -119,6 +120,43 @@ try
     });
 
     app.Map("/ws/status", async (HttpContext context, StatusSnapshotFactory snapshotFactory) =>
+    {
+        if (!context.WebSockets.IsWebSocketRequest)
+        {
+            context.Response.StatusCode = StatusCodes.Status400BadRequest;
+            return;
+        }
+
+        using var webSocket = await context.WebSockets.AcceptWebSocketAsync();
+        var cancellationToken = context.RequestAborted;
+        var watchedMemoryTracker = context.RequestServices.GetRequiredService<IWatchedMemoryTracker>();
+        var lastObservedVersion = watchedMemoryTracker.CurrentVersion;
+        string? lastSentJson = null;
+
+        while (!cancellationToken.IsCancellationRequested && webSocket.State == WebSocketState.Open)
+        {
+            var snapshot = await snapshotFactory.CreateAsync(cancellationToken);
+            var json = JsonSerializer.Serialize(snapshot, websocketJsonOptions);
+
+            if (!string.Equals(lastSentJson, json, StringComparison.Ordinal))
+            {
+                var payload = System.Text.Encoding.UTF8.GetBytes(json);
+                await webSocket.SendAsync(payload, WebSocketMessageType.Text, true, cancellationToken);
+                lastSentJson = json;
+            }
+
+            try
+            {
+                lastObservedVersion = await watchedMemoryTracker.WaitForChangeAsync(lastObservedVersion, cancellationToken)
+                    .WaitAsync(websocketStatusInterval, cancellationToken);
+            }
+            catch (TimeoutException)
+            {
+            }
+        }
+    });
+
+    app.Map("/ws/mobys", async (HttpContext context, MobyListSnapshotFactory snapshotFactory) =>
     {
         if (!context.WebSockets.IsWebSocketRequest)
         {

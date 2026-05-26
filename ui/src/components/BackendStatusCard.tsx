@@ -1,18 +1,11 @@
-import {
-  Alert,
-  ColumnLayout,
-  SpaceBetween,
-} from '@cloudscape-design/components';
-import { useEffect, useMemo, useState } from 'react';
-import { MobyListCard } from './MobyListCard';
-import { MobyInfoCard } from './MobyInfoCard';
+import { Alert, SpaceBetween } from '@cloudscape-design/components';
+import { MobyListModule } from './MobyListModule';
 import { PlayerCard } from './PlayerCard';
-import type { MobySummary } from '../models/gameData';
 import type { StatusResponse } from '../models/backendStatus';
 import {
   getNumericGameId,
   getRatchetMapSnapshot,
-  isRatchetMobyStatus,
+  isRatchetMobyGame,
   isUyaStatus,
 } from '../models/uyaMapSnapshot';
 
@@ -27,28 +20,10 @@ export function BackendStatusCard({
   error,
   pvarOverlayDataVersion,
 }: BackendStatusCardProps) {
-  const [selectedMobyPointer, setSelectedMobyPointer] = useState<number | null>(
-    null,
-  );
-  const [lastMobys, setLastMobys] = useState<MobySummary[]>([]);
   const detectionGameId = getNumericGameId(status);
   const isUyaGame = isUyaStatus(status);
-  const hasMobySnapshot = isRatchetMobyStatus(status);
+  const hasMobyList = isRatchetMobyGame(status);
   const ratchetSnapshot = getRatchetMapSnapshot(status);
-  const liveMobys = ratchetSnapshot?.mobys ?? [];
-  const displayMobys = liveMobys.length > 0 ? liveMobys : lastMobys;
-
-  useEffect(() => {
-    if (liveMobys.length > 0) {
-      setLastMobys(liveMobys);
-    }
-  }, [liveMobys]);
-
-  const selectedMoby = useMemo(
-    () =>
-      displayMobys.find((moby) => moby.pointer === selectedMobyPointer) ?? null,
-    [selectedMobyPointer, displayMobys],
-  );
 
   return (
     <SpaceBetween size="l">
@@ -62,26 +37,12 @@ export function BackendStatusCard({
           position={ratchetSnapshot?.playerPosition ?? null}
         />
       ) : null}
-      {hasMobySnapshot ? (
-        <ColumnLayout columns={selectedMoby ? 2 : 1}>
-          <MobyListCard
-            title="Mobys"
-            mobys={displayMobys}
-            gameId={detectionGameId}
-            showAllocationTabs={detectionGameId !== 4}
-            selectedMoby={selectedMoby}
-            onSelectedMobyChange={(moby: MobySummary | null) =>
-              setSelectedMobyPointer(moby?.pointer ?? null)
-            }
-          />
-          {selectedMoby ? (
-            <MobyInfoCard
-              moby={selectedMoby}
-              gameId={detectionGameId}
-              pvarOverlayDataVersion={pvarOverlayDataVersion}
-            />
-          ) : null}
-        </ColumnLayout>
+      {hasMobyList ? (
+        <MobyListModule
+          key={detectionGameId}
+          gameId={detectionGameId}
+          pvarOverlayDataVersion={pvarOverlayDataVersion}
+        />
       ) : null}
     </SpaceBetween>
   );
