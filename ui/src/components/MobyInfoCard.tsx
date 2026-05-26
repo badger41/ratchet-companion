@@ -23,7 +23,7 @@ import {
   parseMobyMemoryForGame,
 } from '../models/mobyMemory';
 import { formatCoordinate, formatPointer } from '../utils/format';
-import { HexByteView, type HexByteHighlightRange } from './HexByteView';
+import { HexByteView, type HexByteHighlightRange } from './hex-byte-view';
 
 const UYA_PVAR_OVERLAY_VERSION = 3;
 const DL_PVAR_OVERLAY_VERSION = 4;
